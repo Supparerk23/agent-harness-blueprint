@@ -1,0 +1,90 @@
+---
+description: Project-specific engineering principles for AI Wealth Health Check
+alwaysApply: true
+---
+
+# AI Wealth Health Check - Key Principles
+
+## 1) Understand Project Context First
+
+Before proposing or editing code, read the existing project structure and relevant modules to align with how this codebase already works.
+
+- Identify whether the task belongs to:
+  - FastAPI API flow (`app/main.py`, `app/routers/`)
+  - Worker flow (`app/cli/commands/`, `app/services/*`, Pub/Sub listeners)
+  - Shared utilities (`app/services/utils/`, `app/adapter/`, `app/models/`)
+- Prefer extending existing patterns over introducing new architecture.
+- Keep behavior consistent with the current API + worker separation.
+
+## 2) Project Architecture (Source of Truth)
+
+This project is a service split into:
+
+- **API service**: receives requests and triggers processes.
+- **Worker service #1**: subscriber worker for asynchronous report generation and processing.
+- **Worker service #2**: matching listener worker for event-driven matching flows.
+
+Implementation guidance:
+
+- Keep HTTP concerns in routers and API-facing service layers.
+- Keep long-running/background processing in worker/service modules, not in request handlers.
+- Preserve clear separation between routing, business logic, and persistence layers.
+
+# Technology Stack
+
+- **Python:** 3.12+ (follow project runtime)
+- **Package/runtime tooling:** `uv`
+- **Web framework:** `fastapi`
+- **CLI workers:** `typer`
+- **Database:** PostgreSQL + Alembic
+- **Cache:** Redis
+- **Messaging:** Google Pub/Sub
+- **Lint/format:** Ruff
+- **Tests:** pytest
+- **Containers:** docker, docker-compose
+
+# Coding Guidelines
+
+## Python/FastAPI
+
+- Use `def` for sync logic and `async def` for I/O-bound API flows.
+- Use type hints on all public function signatures.
+- Validate request/response contracts with Pydantic models.
+- Keep handlers thin: parse/validate in router, delegate business logic to services.
+- Prefer small, composable functions over large multi-purpose functions.
+
+## Worker Processing
+
+- Worker commands should only orchestrate; core processing belongs in services.
+- Make processing idempotent where possible (safe retries for async workloads).
+- Add explicit status/progress updates for long-running jobs when checkpoints exist.
+- Handle external dependency failures (Pub/Sub, DB, Redis, GCS, third-party APIs) with clear logs and safe exits/retries.
+
+## Error Handling and Observability
+
+- Use guard clauses and early returns to keep happy paths readable.
+- Avoid bare `except`; catch specific exceptions with actionable messages.
+- Log enough context for async debugging (`request_id`, `report_id`, `asset_type`, message metadata).
+- Return user-safe API errors while keeping detailed internal logs.
+
+## Data and Persistence
+
+- Keep database logic in adapter/persistence layers rather than routers.
+- Follow existing soft-delete and relationship patterns in models/adapters.
+- For schema changes, follow Alembic CLI workflow and keep `migration/` scripts aligned.
+
+## Testing and Validation
+
+- Add or update tests for changed behavior, especially:
+  - router request/response contracts
+  - service business logic
+  - worker processing paths and failure cases
+- Prefer focused unit tests plus targeted integration tests where external systems are involved.
+
+## Cursor AI Behavior for This Repository
+
+- Read first, then change: inspect existing code paths before proposing refactors.
+- Keep edits minimal, explicit, and consistent with local conventions.
+- Avoid introducing new frameworks or patterns unless clearly needed.
+- When touching routers, keep endpoint docs synchronized with `app/routers/README.md`.
+- When touching migrations, follow the Alembic CLI-only policy and update related SQL migration scripts.
