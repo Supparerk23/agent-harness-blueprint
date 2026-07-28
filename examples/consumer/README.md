@@ -46,6 +46,6 @@ overrides:
 
 **Copied (managed):** `.cursor/commands`, `.cursor/skills`, `.cursor/rules` from selected blueprint, `AGENTS.md`, `CLAUDE.md`, `templates/review-checklist.md`.
 
-**Local state (never overwritten if present):** `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`, `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md`, `ARCHITECTURE.md`.
+**Local state (created in the consumer, never part of the blueprint package):** `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`, `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md`, `ARCHITECTURE.md`.
 
 **Local overrides (always win):** `*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`.

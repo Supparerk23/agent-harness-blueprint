@@ -1,10 +1,10 @@
 # Skills — concepts
 
-Skills live under [.cursor/skills/](../.cursor/skills/) as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
+Package sources live under [harness/skills/](../harness/skills/). After install, the same folders appear under the consumer's `.cursor/skills/` as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
 
 ## `planning-execution-tracking`
 
-**Intent:** Tie each implementation batch back to observable artifacts:
+**Intent:** Tie each implementation batch back to observable artifacts in the **adopting project**:
 
 - reconcile `PLANNING.md` checkboxes / `## ✅ Done`,
 - append a succinct `DECISIONS.md` line (did / why),
@@ -29,7 +29,7 @@ Companion **test-strategy** lays out regression priorities and safety rails. The
 
 ## `docs-style`
 
-**Intent:** Opinionated docs layout—thin root `README`, deeper material inside `docs/` (with `documents/` as a legacy symlink) plus guidance for richer `ARCHITECTURE.md` write-ups (Mermaid, lifecycle fidelity). Also `disable-model-invocation`; use when refactoring documentation IA.
+**Intent:** Opinionated docs layout—thin root `README`, deeper material inside `docs/` plus guidance for richer `ARCHITECTURE.md` write-ups (Mermaid, lifecycle fidelity). Also `disable-model-invocation`; use when refactoring documentation IA.
 
 ## `skill-creator`
 

@@ -1,9 +1,11 @@
-# Rules — concepts (`.cursor/rules/`)
+# Rules — concepts (`harness/rules/` → consumer `.cursor/rules/`)
 
 Rules are `.mdc` files with YAML frontmatter:
 
 - **`alwaysApply: true`** — broadly injected context; keep bullets tight so prompts stay usable.
 - **`alwaysApply: false` + `globs`** — only attach when editing matching paths.
+
+Shared defaults live under `harness/rules/`. Stack-specific rules live under `blueprints/engineering/fastapi/rules/` and are installed only with that blueprint.
 
 ## `planning-execution-tracking.mdc`
 
@@ -11,7 +13,7 @@ Thin shim that points agents to the **planning-execution-tracking** skill: after
 
 ## `key-principles.mdc`
 
-Anchors repo-wide Python engineering etiquette for the originating service:
+Anchors repo-wide Python engineering etiquette for the originating service (engineering-fastapi profile):
 
 - distinguish API routers vs asynchronous workers (`typer`, Pub/Sub),
 - reinforce stack norms (`uv`, Ruff, pytest),

@@ -1,15 +1,15 @@
-# Slash commands (`.cursor/commands`)
+# Slash commands (`harness/commands/` → consumer `.cursor/commands`)
 
-| Command | Purpose |
-|---|---|
-| `/start` | Branch + reset task memory skeletons (`PLANNING`, `RUN_LOG`, caches). |
-| `/commit` | Inspect diffs/staging, craft conventional commits, push/upstream reminders. *(Template references JIRA + guarded branches—adapt on GitHub-only repos.)* |
-| `/sync-dev` | Merge latest `develop` using `merge-tree` previews + conflict playbook. |
-| `/prerequisite` | GitLab **`glab`** bootstrap shared by MR-oriented commands. |
-| `/pr` | Open a GitLab merge request via `glab`, seeding title/body from planning artifacts. |
-| `/review` | MR or diff review checklist (security, correctness, performance). |
-| `/fix-comment` | Resolve a specific GitLab MR discussion via deterministic `glab` steps. |
+| Command | Source | Purpose |
+|---|---|---|
+| `/start` | `harness/commands/start.md` | Branch + reset task memory skeletons (`PLANNING`, `RUN_LOG`, caches). |
+| `/commit` | `harness/commands/commit.md` | Inspect diffs/staging, craft conventional commits, push/upstream reminders. *(Template references JIRA + guarded branches—adapt on GitHub-only repos.)* |
+| `/review` | `harness/commands/review.md` | Diff review checklist (security, correctness, performance). |
+| `/sync-dev` | `blueprints/engineering/gitlab/commands/` | Merge latest `develop` using `merge-tree` previews + conflict playbook. |
+| `/prerequisite` | GitLab overlay | GitLab **`glab`** bootstrap shared by MR-oriented commands. |
+| `/pr` | GitLab overlay | Open a GitLab merge request via `glab`, seeding title/body from planning artifacts. |
+| `/fix-comment` | GitLab overlay | Resolve a specific GitLab MR discussion via deterministic `glab` steps. |
 
 ## Forge portability
 
-These playbooks assume **GitLab + `glab`**. If you live on GitHub, keep the markdown as narrative guidance and swap in `gh` flows (or delete unused command files to avoid confusion).
+GitLab/`glab` playbooks are an **optional overlay** (`--overlay gitlab`), not part of `default`. If you live on GitHub, skip that overlay or add a future `gh` overlay.

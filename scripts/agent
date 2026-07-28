@@ -318,10 +318,24 @@ cmd_sync() {
 cmd_doctor() {
   local dest_root="$TARGET"
   local errors=0
+  local package_mode=0
+  # Resolve absolute paths for comparison when possible
+  local abs_dest abs_root
+  abs_dest="$(cd "$dest_root" 2>/dev/null && pwd || echo "$dest_root")"
+  abs_root="$(cd "$ROOT" 2>/dev/null && pwd || echo "$ROOT")"
+  if [[ "$abs_dest" == "$abs_root" ]]; then
+    package_mode=1
+  fi
+
   need_file "$MANIFEST"
   need_file "$VERSION_FILE"
   log "package: $(package_version)"
   log "manifest: $MANIFEST"
+  if [[ "$package_mode" -eq 1 ]]; then
+    log "mode: package-source (consumer runtime not expected here)"
+  else
+    log "mode: consumer-target"
+  fi
 
   for d in blueprints/default harness/commands harness/rules harness/skills templates/memory prompts/system scripts; do
     if [[ ! -e "${ROOT}/$d" ]]; then
@@ -332,11 +346,28 @@ cmd_doctor() {
     fi
   done
 
-  if [[ -d "${dest_root}/.cursor" ]]; then
-    log "ok: runtime .cursor present"
+  # Package must not contain adoption/runtime artifacts
+  if [[ "$package_mode" -eq 1 ]]; then
+    for bad in .cursor PLANNING.md DECISIONS.md RUN_LOG.md HOTCACHE.md LEARNING.md ANTI-PATTERNS.md; do
+      if [[ -e "${dest_root}/${bad}" ]]; then
+        warn "package should not contain consumer artifact: $bad"
+        errors=$((errors + 1))
+      else
+        log "ok: absent consumer artifact $bad"
+      fi
+    done
   else
-    warn "runtime .cursor missing (run: scripts/agent install <blueprint>)"
-    errors=$((errors + 1))
+    if [[ -d "${dest_root}/.cursor" ]]; then
+      log "ok: runtime .cursor present"
+    else
+      warn "runtime .cursor missing (run: scripts/agent install <blueprint>)"
+      errors=$((errors + 1))
+    fi
+    if [[ -f "${dest_root}/${STATE_FILE}" ]]; then
+      log "ok: ${STATE_FILE}"
+    else
+      warn "no ${STATE_FILE} (run init/install)"
+    fi
   fi
 
   for f in AGENTS.md CLAUDE.md; do
@@ -347,12 +378,6 @@ cmd_doctor() {
       errors=$((errors + 1))
     fi
   done
-
-  if [[ -f "${dest_root}/${STATE_FILE}" ]]; then
-    log "ok: ${STATE_FILE}"
-  else
-    warn "no ${STATE_FILE} (run init/install)"
-  fi
 
   if command -v glab >/dev/null 2>&1; then
     log "ok: glab available"

@@ -1,8 +1,10 @@
 # Memory & planning layers
 
-`/start` keeps **planning**, **telemetry**, **rationale**, **draft learning**, and **safety memory** in separate files so agents do not treat chat logs as the system of record.
+`/start` keeps **planning**, **telemetry**, **rationale**, **draft learning**, and **safety memory** in separate files in the **adopting project** so agents do not treat chat logs as the system of record.
 
-## Repo-root files
+These files are **not** part of the blueprint package. Package templates live under `templates/memory/` and `harness/skills/*/templates.md`.
+
+## Consumer repo-root files
 
 | File | Concept | Lifecycle |
 |---|---|---|
@@ -16,7 +18,7 @@
 
 ## Related skills
 
-- **[memory-system-protocol](../.cursor/skills/memory-system-protocol/SKILL.md)** explains consolidation, read order, and why each layer exists.
-- **[planning-execution-tracking](../.cursor/skills/planning-execution-tracking/SKILL.md)** governs checklist updates plus `DECISIONS` / `RUN_LOG` hygiene after each execution batch.
+- **[memory-system-protocol](../harness/skills/memory-system-protocol/SKILL.md)** explains consolidation, read order, and why each layer exists.
+- **[planning-execution-tracking](../harness/skills/planning-execution-tracking/SKILL.md)** governs checklist updates plus `DECISIONS` / `RUN_LOG` hygiene after each execution batch.
 
 Together they turn “what happened?” into auditable artifacts instead of long chat scrollback.

@@ -1,9 +1,0 @@
-# This repository IS the shared-agent-blueprints package.
-source: .
-version: 1.0.0
-blueprint: engineering-fastapi
-overlay: gitlab
-installed_at_utc: 2026-07-28T05:00:00Z
-conflict_policy: preserve-local
-runtime_root: .cursor
-role: package-source

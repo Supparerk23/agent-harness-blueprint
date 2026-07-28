@@ -2,19 +2,26 @@
 
 Shared agent instructions for repositories using **shared-agent-blueprints**.
 
-## Runtime layout (compatibility)
+## Package vs consumer
 
-Cursor reads local paths. This package installs into:
+- **This package** stores shared sources under `harness/`, `prompts/`, `templates/`, and `blueprints/`.
+- **Consuming projects** receive a generated `.cursor/` runtime plus memory files via `scripts/agent install`.
+
+Do not keep task-memory files (`PLANNING.md`, `RUN_LOG.md`, etc.) or a live `.cursor/` tree inside the blueprint package itself.
+
+## Runtime layout (in consumers)
+
+Cursor reads local paths. Install writes:
 
 - `.cursor/commands/` — slash playbooks
 - `.cursor/skills/` — curated procedures
 - `.cursor/rules/` — always-on / glob policies
 
-Canonical shared sources live in this package under `harness/`, `prompts/`, and `templates/`. Prefer updating those sources, then run `scripts/agent sync`.
+Prefer updating package sources under `harness/`, then run `scripts/agent sync --target <consumer>`.
 
-## Memory harness
+## Memory harness (consumer-only)
 
-When present at the repo root:
+When present at the **consumer** repo root:
 
 | File | Role |
 |---|---|
@@ -26,9 +33,9 @@ When present at the repo root:
 | `ANTI-PATTERNS.md` | High-confidence safety bans |
 | `ARCHITECTURE.md` | Stable design (never auto-reset) |
 
-## Overrides
+Pristine templates: `templates/memory/`.
 
-Project-specific customizations belong in:
+## Overrides (consumer-only)
 
 - `AGENTS.local.md`
 - `CLAUDE.local.md`
@@ -40,11 +47,11 @@ Shared installs must not overwrite local state files (`PLANNING.md`, `RUN_LOG.md
 ## CLI
 
 ```bash
-scripts/agent init
-scripts/agent install default
-scripts/agent install engineering-fastapi --overlay gitlab
-scripts/agent update
-scripts/agent sync
+scripts/agent init --target /path/to/repo
+scripts/agent install default --target /path/to/repo
+scripts/agent install engineering-fastapi --overlay gitlab --target /path/to/repo
+scripts/agent update --target /path/to/repo
+scripts/agent sync --target /path/to/repo
 scripts/agent doctor
 ```
 

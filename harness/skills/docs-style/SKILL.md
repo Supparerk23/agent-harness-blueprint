@@ -15,7 +15,7 @@ Apply this repository documentation pattern consistently:
 3. Split large docs into focused topic files.
 4. Preserve all important operational content during refactors.
 
-In this blueprint package, `documents/` is a compatibility symlink to `docs/`. Prefer writing and linking `docs/` in new work.
+Prefer writing and linking `docs/` for narrative documentation.
 
 ## Rules
 
@@ -27,7 +27,7 @@ In this blueprint package, `documents/` is a compatibility symlink to `docs/`. P
 - Use clean file names without numeric prefixes.
 - Maintain `docs/README.md` as the docs index.
 - Never drop meaningful content when splitting; relocate it.
-- Do not maintain a second parallel docs tree (no `docs/` + `documents/` content duplication).
+- Do not create a second parallel docs tree beside `docs/`.
 
 ## Default Document Layout
 

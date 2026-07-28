@@ -1,6 +1,0 @@
-| Timestamp UTC | Agent | Branch | Commit | Scope | Files | Input Tok | Output Tok | Duration | Tests | Retry | Status | Errors | Notes |
-|---|---|---|---|---|---:|---:|---:|---|---|---:|---|---|---|
-| 2026-07-28 15:18 | Cursor Agent | feature/init-shared | bd0fbd2 | Deduplicate docs trees | docs README manifest docs-style PLANNING DECISIONS RUN HOTCACHE | - | - | - | symlink:documents→docs; path smoke pass | 0 | Complete | - | Canonical docs/; documents kept as compatibility symlink |
-| 2026-07-28 04:57 | Cursor Agent | feature/init-shared | bd0fbd2 | Shared blueprint package | VERSION manifest blueprints harness prompts templates docs scripts AGENTS CLAUDE examples README | - | - | - | agent:doctor pass; install temp target pass | 0 | Complete | - | Non-destructive migration; .cursor preserved; FastAPI/GitLab as overlays |
-| 2026-05-17 14:10 | Cursor Agent | feature/readme-cursor-kit | - | Docs IA split | README documents PLANNING HOTCACHE RUN DECISIONS | - | - | - | docs:manual | 0 | Complete | - | Short README + migrated detail to documents/* per docs-style harness |
-| 2026-05-17 12:05 | Cursor Agent | feature/readme-cursor-kit | - | README + harness docs | PLANNING HOTCACHE README RUN DECISIONS ANTI LEARNING | - | - | - | docs:manual | 0 | Complete | - | Authored README concepts for skills/rules · applied `/start` memory reset |

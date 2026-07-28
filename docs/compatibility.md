@@ -1,35 +1,33 @@
 # Compatibility layer
 
-This repository remains usable as a **direct Cursor kit** while also acting as a **shared blueprint package**.
+This repository is the **shared blueprint package**. Consuming projects receive a generated Cursor runtime and memory files via `scripts/agent`.
 
-## Stable paths (do not break)
-
-| Path | Status |
-|---|---|
-| `.cursor/commands/` | Compatibility runtime — still authoritative for current Cursor sessions |
-| `.cursor/skills/` | Compatibility runtime |
-| `.cursor/rules/` | Compatibility runtime |
-| `docs/` | Canonical narrative documentation |
-| `documents/` | Compatibility symlink → `docs/` (legacy path) |
-| Root memory files | Local state — not package sources |
-| `AGENTS.md` / `CLAUDE.md` | Compatibility agent entrypoints |
-
-## Shared sources
+## Package paths (source of truth)
 
 | Path | Role |
 |---|---|
-| `harness/` | Canonical shared commands/rules/skills |
+| `harness/` | Canonical shared commands, rules, skills |
 | `prompts/` | Prompt library |
 | `templates/` | Memory + PRD/ADR/review templates |
 | `blueprints/` | Composable profiles (`default`, `engineering`, `engineering-fastapi`, `startup`) |
-| `docs/` | Package documentation (single source of truth) |
+| `docs/` | Package documentation |
 | `manifest.yaml` / `VERSION` | Package metadata |
 | `scripts/agent` | Install / sync / doctor CLI |
+| `AGENTS.md` / `CLAUDE.md` | Package entrypoint docs (also copied into consumers on install) |
 
-## How existing projects keep working
+## Consumer-only paths (do not commit in this package)
 
-1. Continue copying or using `.cursor/` as before.
-2. Or run `scripts/agent install <blueprint>` which writes into `.cursor/` with `preserve-local` conflict policy.
+| Path | Role |
+|---|---|
+| `.cursor/` | Runtime install target generated from `harness/` + blueprint overlays |
+| `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md` | Task planning / rationale / telemetry state |
+| `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md` | Short-lived / curated consumer memory |
+| `ARCHITECTURE.md` | Optional stable design doc in the consumer |
+| `.agent-blueprint.yaml` | Install state for that consumer |
+
+## How adopting projects work
+
+1. Run `scripts/agent install <blueprint> --target /path/to/repo`.
+2. The installer writes `.cursor/` and memory templates into the target with `preserve-local` conflict policy.
 3. Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) always win over managed files.
-4. Memory state files are never overwritten by install/sync when they already exist.
-5. Old `documents/*` links resolve via the `documents` → `docs` symlink.
+4. Memory state files are never overwritten by install/sync when they already exist in the target.

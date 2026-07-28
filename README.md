@@ -1,24 +1,20 @@
 # Shared Agent Blueprints
 
-Reusable **Cursor** agent harness packaged as composable blueprints. Preserves the existing `.cursor/` runtime so current projects keep working, while adding `manifest.yaml`, shared sources, and a lightweight install CLI.
+Reusable **Cursor** agent harness packaged as composable blueprints. This repository is the **package source** — it does not ship a live project `.cursor/` tree or task-memory files.
 
 Originated with Finnomena's *AI Wealth Health Check* FastAPI + worker service. Stack-specific rules live under `blueprints/engineering/fastapi/` — not in the default profile.
 
-## Quick start (new)
+## Quick start
 
 ```bash
 scripts/agent doctor
-scripts/agent install default
+scripts/agent install default --target /path/to/your-repo
 # or
-scripts/agent install engineering-fastapi --overlay gitlab
-scripts/agent sync --dry-run
+scripts/agent install engineering-fastapi --overlay gitlab --target /path/to/your-repo
+scripts/agent sync --dry-run --target /path/to/your-repo
 ```
 
-## Quick start (legacy — still supported)
-
-1. Copy `.cursor/` (or cherry-pick files) into the target repo.
-2. Run **`/start`** to reset task-memory files from skill templates.
-3. See **[docs/quick-start.md](docs/quick-start.md)**.
+Install writes `.cursor/`, optional `AGENTS.md` / `CLAUDE.md`, and memory files **into the target project** from `harness/` + `templates/`.
 
 ## Package layout
 
@@ -29,13 +25,24 @@ scripts/agent sync --dry-run
 ├── harness/             # canonical shared commands, rules, skills
 ├── prompts/             # prompt library
 ├── templates/           # memory + PRD/ADR/review templates
-├── docs/                # canonical package docs
-├── documents -> docs    # compatibility symlink (legacy path)
+├── docs/                # package docs
 ├── scripts/agent        # init | install | update | sync | doctor
 ├── AGENTS.md / CLAUDE.md
-├── .cursor/             # compatibility runtime (unchanged behavior)
 └── examples/consumer/   # example consuming project config
 ```
+
+## Not in this package (consumer-only)
+
+These are created in adopting projects by `scripts/agent init|install` or `/start`:
+
+| Artifact | Why consumer-only |
+|---|---|
+| `.cursor/` | Runtime install target generated from `harness/` + blueprint overlays |
+| `PLANNING.md` `DECISIONS.md` `RUN_LOG.md` | Task state |
+| `HOTCACHE.md` `LEARNING.md` `ANTI-PATTERNS.md` | Operational / reflection memory |
+| `.agent-blueprint.yaml` | Install state for that project |
+
+Pristine sources live under `templates/memory/` and `harness/`.
 
 ## Blueprints
 
@@ -50,7 +57,7 @@ GitLab/`glab` MR commands are an **overlay**: `--overlay gitlab`.
 
 ## Compatibility
 
-See **[docs/compatibility.md](docs/compatibility.md)**. Local overrides: `AGENTS.local.md`, `CLAUDE.local.md`, `.agent-blueprint.local.yaml`, `*.local.mdc`.
+See **[docs/compatibility.md](docs/compatibility.md)**. Local overrides in consumers: `AGENTS.local.md`, `CLAUDE.local.md`, `.agent-blueprint.local.yaml`, `*.local.mdc`.
 
 ## Documentation
 

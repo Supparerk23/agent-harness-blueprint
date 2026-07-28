@@ -66,18 +66,26 @@ templates:
   - review-checklist.md
 
 compatibility:
-  legacy_paths:
+  # Paths written into consuming projects (not stored as live runtime in this package).
+  consumer_install_targets:
     - AGENTS.md
     - CLAUDE.md
     - .cursor/commands
     - .cursor/skills
     - .cursor/rules
-    - documents/   # symlink → docs/
   docs_root: docs/
-  # Runtime Cursor layout remains the install target; harness/ is the shared source.
   runtime_root: .cursor
   source_root: harness
   managed_marker: "<!-- managed-by: shared-agent-blueprints -->"
+  package_must_not_contain:
+    - .cursor/
+    - PLANNING.md
+    - DECISIONS.md
+    - RUN_LOG.md
+    - HOTCACHE.md
+    - LEARNING.md
+    - ANTI-PATTERNS.md
+    - .agent-blueprint.yaml
   local_override_files:
     - .agent-blueprint.local.yaml
     - AGENTS.local.md

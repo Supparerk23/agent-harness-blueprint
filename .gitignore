@@ -1,3 +1,17 @@
 .DS_Store
 *.blueprint-conflict
 .tmp-consumer-test/
+
+# Adoption/runtime artifacts belong in consuming projects, not this package
+.cursor/
+PLANNING.md
+DECISIONS.md
+RUN_LOG.md
+HOTCACHE.md
+LEARNING.md
+ANTI-PATTERNS.md
+ARCHITECTURE.md
+.agent-blueprint.yaml
+.agent-blueprint.local.yaml
+AGENTS.local.md
+CLAUDE.local.md
