@@ -1,0 +1,30 @@
+name: engineering
+version: 1.0.0
+extends: default
+description: Engineering workflows — commit playbook, review prompts, refactor skill.
+
+includes:
+  harness:
+    commands:
+      - commit.md
+    skills:
+      - refactor-code
+  prompts:
+    commands:
+      - commit.md
+    reviews:
+      - code-review.md
+  templates:
+    - adr.md
+    - review-checklist.md
+
+# Optional forge overlay (not applied unless selected):
+#   agent install engineering --overlay gitlab
+overlays:
+  gitlab:
+    path: gitlab
+    commands:
+      - prerequisite.md
+      - pr.md
+      - fix-comment.md
+      - sync-dev.md

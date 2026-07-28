@@ -29,7 +29,7 @@ Companion **test-strategy** lays out regression priorities and safety rails. The
 
 ## `docs-style`
 
-**Intent:** Opinionated docs layout—thin root `README`, deeper material inside `documents/` with indexes plus guidance for richer `ARCHITECTURE.md` write-ups (Mermaid, lifecycle fidelity). Also `disable-model-invocation`; use when refactoring documentation IA.
+**Intent:** Opinionated docs layout—thin root `README`, deeper material inside `docs/` (with `documents/` as a legacy symlink) plus guidance for richer `ARCHITECTURE.md` write-ups (Mermaid, lifecycle fidelity). Also `disable-model-invocation`; use when refactoring documentation IA.
 
 ## `skill-creator`
 

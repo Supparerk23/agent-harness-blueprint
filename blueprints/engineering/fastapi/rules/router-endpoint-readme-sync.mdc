@@ -1,0 +1,22 @@
+---
+description: Keep routers README in sync with endpoint changes
+globs: app/routers/*.py
+alwaysApply: false
+---
+
+# Router Endpoint README Sync
+
+When changing API endpoints in `app/routers/`, also update `app/routers/README.md` in the same change.
+
+## Required updates
+
+- Add README entries for new endpoints.
+- Remove README entries for deleted endpoints.
+- Rename or adjust method/path entries for changed endpoints.
+- Update the short description when endpoint behavior changes significantly.
+
+## What counts as endpoint changes
+
+- `@router.get(...)`, `@router.post(...)`, `@router.put(...)`, `@router.patch(...)`, `@router.delete(...)`
+- Router prefix changes that alter full endpoint paths
+- Path parameter changes (for example `{id}` renamed)

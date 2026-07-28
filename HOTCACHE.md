@@ -1,17 +1,16 @@
 # HOTCACHE.md
 
-Last updated UTC: 2026-05-17
+Last updated UTC: 2026-07-28
 
 ## Active State
-
-- Branch: `feature/readme-cursor-kit` · HEAD: `-`
-
-- Focus: Maintain shortened README plus `documents/` references for blueprint consumers
+- Branch: `feature/init-shared` · HEAD: `bd0fbd2`
+- Focus: Docs tree deduplicated (`docs/` canonical; `documents` → `docs` symlink)
 
 ## Working Assumptions
-
-- Operational detail now lives chiefly under `documents/` while root `README` stays a waypoint
+- Narrative docs live only under `docs/`
+- `documents/` is a legacy symlink alias, not a second content tree
+- `.cursor/` remains the compatibility runtime; `harness/` is the shared source for generic assets
 
 ## Immediate Next Steps
-
-- (none pending)
+- Optional: add GitHub/`gh` overlay mirroring GitLab commands
+- Optional: first managed sync pass to stamp markers on copied runtime files in consumers
