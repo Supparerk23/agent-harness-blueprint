@@ -21,6 +21,8 @@ source "${ROOT}/lib/blueprint/events.sh"
 source "${ROOT}/lib/blueprint/context.sh"
 # shellcheck source=lib/blueprint/history.sh
 source "${ROOT}/lib/blueprint/history.sh"
+# shellcheck source=lib/blueprint/targets.sh
+source "${ROOT}/lib/blueprint/targets.sh"
 # shellcheck source=lib/blueprint/session.sh
 source "${ROOT}/lib/blueprint/session.sh"
 # shellcheck source=lib/blueprint/repo.sh
@@ -643,6 +645,7 @@ installed_at_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 conflict_policy: preserve-local
 EOF
   emit_file_added "$out"
+  targets_upsert "$dest_root" "$ver" || true
 }
 
 read_state_field() {
@@ -717,6 +720,11 @@ cmd_init() {
     write_state "$dest_root" "default" ""
   else
     emit_file_skipped "${dest_root}/${STATE_FILE}" "preserve"
+    if [[ "$DRY_RUN" -eq 0 ]]; then
+      local existing_ver
+      existing_ver="$(read_state_field "${dest_root}/${STATE_FILE}" version "$(package_version)")"
+      targets_upsert "$dest_root" "$existing_ver" || true
+    fi
   fi
   if [[ ! -f "${dest_root}/${LOCAL_OVERRIDE}" && "$DRY_RUN" -eq 0 ]]; then
     cat > "${dest_root}/${LOCAL_OVERRIDE}" <<'EOF'
@@ -1200,17 +1208,11 @@ EOF
   return 0
 }
 
-menu_prompt_target() {
-  local _required="${1:-0}"
+menu_prompt_target_path() {
   local raw="" resolved=""
-  local default_hint="$TARGET"
-
-  if [[ -z "$default_hint" || "$default_hint" == "." ]] || paths_equal "$default_hint" "$ROOT"; then
-    default_hint=""
-  fi
+  local default_hint="${1:-}"
 
   while true; do
-    # Banner on every prompt attempt (first step of ./blueprint).
     menu_splash "$(pwd)"
     cat <<EOF
   Consumer project target
@@ -1281,9 +1283,90 @@ EOF
     fi
 
     TARGET="$resolved"
+    targets_remember "$TARGET" || true
     emit_info "target locked: $TARGET"
     return 0
   done
+}
+
+menu_prompt_target_pick() {
+  local -a t_paths=()
+  local -a versions=()
+  local t_path ver
+  while IFS=$'\t' read -r t_path ver || [[ -n "${t_path:-}" ]]; do
+    [[ -n "$t_path" ]] || continue
+    t_paths+=("$t_path")
+    versions+=("${ver:-}")
+  done < <(targets_list)
+
+  local n="${#t_paths[@]}"
+  if [[ "$n" -eq 0 ]]; then
+    return 1
+  fi
+
+  local add_idx=$((n + 1))
+  while true; do
+    menu_splash "$(pwd)"
+    printf '  Known consumer projects\n\n' >&2
+    local i disp
+    for ((i = 0; i < n; i++)); do
+      disp="$(term_home_path "${t_paths[$i]}")"
+      printf '  %s%d%s) %-40s  v%s\n' \
+        "$(term_color cyan)" "$((i + 1))" "$(term_color reset)" \
+        "$disp" "${versions[$i]:-?}" >&2
+    done
+    printf '  %s%d%s) Add new target project\n\n' \
+      "$(term_color cyan)" "$add_idx" "$(term_color reset)" >&2
+
+    local choice=""
+    printf 'Target [1-%d]: ' "$add_idx" >&2
+    read -r choice || true
+    choice="${choice#"${choice%%[![:space:]]*}"}"
+    choice="${choice%"${choice##*[![:space:]]}"}"
+
+    if [[ "$choice" == "$add_idx" || "$choice" == "n" || "$choice" == "new" || "$choice" == "add" ]]; then
+      return 1
+    fi
+
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 && "$choice" -le "$n" ]]; then
+      local idx=$((choice - 1))
+      local selected="${t_paths[$idx]}"
+      if [[ ! -d "$selected" ]]; then
+        warn "path no longer exists: $selected — pick another or add new"
+        continue
+      fi
+      if paths_equal "$selected" "$ROOT"; then
+        warn "that path IS this blueprint package — pick a different consumer project"
+        continue
+      fi
+      TARGET="$(cd "$selected" && pwd)"
+      targets_remember "$TARGET" || true
+      emit_info "target locked: $TARGET"
+      return 0
+    fi
+
+    warn "invalid choice: $choice (use 1-$add_idx)"
+  done
+}
+
+menu_prompt_target() {
+  local _required="${1:-0}"
+  local default_hint="$TARGET"
+
+  if [[ -z "$default_hint" || "$default_hint" == "." ]] || paths_equal "$default_hint" "$ROOT"; then
+    default_hint=""
+  fi
+
+  # Fill from prior CLI runs when registry is still empty.
+  targets_bootstrap_from_history || true
+
+  if [[ "$(targets_count)" -gt 0 ]]; then
+    if menu_prompt_target_pick; then
+      return 0
+    fi
+  fi
+
+  menu_prompt_target_path "$default_hint"
 }
 
 menu_run() {
@@ -1368,14 +1451,18 @@ cmd_menu() {
         printf '\n  %sPress Enter to return to menu…%s ' "$(term_color dim)" "$(term_color reset)"
         read -r _ || true
         ;;
-      8|q|quit|exit|"")
+      8|back|b)
+        menu_splash "$(pwd)"
+        menu_prompt_target 1
+        ;;
+      0|q|quit|exit|"")
         term_reset_clear_flag
         term_smart_clear
         printf '  %sbye%s\n' "$(term_color dim)" "$(term_color reset)"
         return 0
         ;;
       *)
-        warn "invalid choice: $choice (use 1-8)"
+        warn "invalid choice: $choice (use 0-8)"
         sleep 0.6 2>/dev/null || true
         ;;
     esac

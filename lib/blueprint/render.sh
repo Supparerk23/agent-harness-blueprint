@@ -133,7 +133,8 @@ render_menu() {
   printf '  %s5%s  doctor     Validate package / target health\n' "$(term_color cyan)" "$(term_color reset)"
   printf '  %s6%s  target     Change consumer project path\n' "$(term_color cyan)" "$(term_color reset)"
   printf '  %s7%s  help       Show CLI usage\n' "$(term_color cyan)" "$(term_color reset)"
-  printf '  %s8%s  quit\n' "$(term_color cyan)" "$(term_color reset)"
+  printf '  %s8%s  back       Return to target project picker\n' "$(term_color cyan)" "$(term_color reset)"
+  printf '  %s0%s  quit\n' "$(term_color cyan)" "$(term_color reset)"
   printf '\n'
   printf '  %s›%s ' "$(term_color magenta)$(term_color bold)" "$(term_color reset)"
 }

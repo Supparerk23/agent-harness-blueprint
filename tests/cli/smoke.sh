@@ -65,18 +65,19 @@ assert_not_contains() {
 }
 
 cleanup() {
-  rm -rf "$TMP"
+  rm -rf "$TMP" "${TMP}-xdg" "${TMP}-empty" "${TMP}-remote-consumer" "${TMP}-targets.json"
 }
 trap cleanup EXIT
 
 export CI=1
 export NO_COLOR=1
 export BLUEPRINT_HISTORY_LIMIT=10
-# Isolate history/cache for tests
+# Isolate history/cache/targets for tests
 export XDG_DATA_HOME="${TMP}-xdg/data"
 export XDG_CACHE_HOME="${TMP}-xdg/cache"
+export BLUEPRINT_TARGETS_FILE="${TMP}-targets.json"
 mkdir -p "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
-rm -rf "$TMP"
+rm -rf "$TMP" "${TMP}-targets.json"
 mkdir -p "$TMP"
 
 echo "== init =="
@@ -140,6 +141,26 @@ echo "== history written =="
 hist="${XDG_DATA_HOME}/blueprint/history.jsonl"
 assert_file "history jsonl" "$hist"
 assert_contains "history has runId" "$(head -1 "$hist")" '"runId"'
+
+echo "== targets registry =="
+assert_file "targets.json written" "$BLUEPRINT_TARGETS_FILE"
+assert_contains "targets has path" "$(cat "$BLUEPRINT_TARGETS_FILE")" "$TMP"
+assert_contains "targets has version" "$(cat "$BLUEPRINT_TARGETS_FILE")" '"version"'
+# Second consumer should upsert a distinct path (newest first).
+other="${TMP}-other"
+rm -rf "$other"
+mkdir -p "$other"
+CI=1 NO_COLOR=1 "$BP" init --target "$other" >/dev/null 2>&1
+tg="$(cat "$BLUEPRINT_TARGETS_FILE")"
+assert_contains "targets has second path" "$tg" "$other"
+# Count path entries (should be 2 unique).
+path_count="$(printf '%s' "$tg" | grep -c '"path"' || true)"
+assert_eq "targets unique count" "$path_count" "2"
+# Re-init same target should not duplicate.
+CI=1 NO_COLOR=1 "$BP" init --target "$TMP" >/dev/null 2>&1
+path_count="$(grep -c '"path"' "$BLUEPRINT_TARGETS_FILE" || true)"
+assert_eq "targets upsert no duplicate" "$path_count" "2"
+rm -rf "$other"
 
 echo "== remote fetchable detection (unit via bash) =="
 # shellcheck source=lib/blueprint/repo.sh

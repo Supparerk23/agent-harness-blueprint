@@ -13,4 +13,5 @@ ANTI-PATTERNS.md
 .agent-blueprint/
 AGENTS.local.md
 CLAUDE.local.md
+targets.json
 # --- end shared-agent-blueprints ---

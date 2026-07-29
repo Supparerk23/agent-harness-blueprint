@@ -72,6 +72,8 @@ When `.agent-blueprint.yaml` `source` is a git URL (`https://…`, `git@…`, `f
 
 Credentials are never printed; interrupted runs store resume state under `.agent-blueprint/` in the consumer (gitignored).
 
+Interactive `./blueprint` remembers consumer targets in package-local `targets.json` (path + blueprint version, updated on `init` / state writes). That file is gitignored and must not be committed. When it has entries, the first menu step offers a picker plus “Add new target project”; when empty, it prompts for a path as before.
+
 ## Blueprints
 
 ```mermaid

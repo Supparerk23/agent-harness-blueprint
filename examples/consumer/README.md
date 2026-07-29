@@ -65,3 +65,5 @@ Workflow docs such as `review-checklist.md` / `adr.md` land under `.cursor/templ
 **Local overrides (always win):** `*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`.
 
 **Session / history:** `.agent-blueprint/` holds resume state (gitignored). Run history lives in `$XDG_DATA_HOME/blueprint/history.jsonl` on the machine running the CLI.
+
+**Known targets:** the package-local `targets.json` next to the `blueprint` CLI records consumer paths + blueprint version after `init` / state writes. It is gitignored (`templates/gitignore` + package `.gitignore`) and must not be committed.
