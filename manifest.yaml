@@ -52,6 +52,7 @@ prompts:
 templates:
   - entrypoints/AGENTS.md
   - entrypoints/CLAUDE.md
+  - gitignore
   - memory/planning.md
   - memory/decisions.md
   - memory/run-log.md
@@ -70,9 +71,11 @@ compatibility:
     - .cursor/commands
     - .cursor/skills
     - .cursor/rules
+    - .cursor/templates
     - .claude/commands
     - .claude/skills
     - .claude/rules
+    - .claude/templates
   docs_root: docs/
   runtime_roots:
     - .cursor
@@ -97,7 +100,7 @@ compatibility:
 
 install:
   conflict_policy: preserve-local
-  default_runtime: all
+  default_runtime: prompt
   copy_memory_templates_to_root: true
   do_not_overwrite:
     - PLANNING.md
@@ -107,3 +110,4 @@ install:
     - LEARNING.md
     - ANTI-PATTERNS.md
     - ARCHITECTURE.md
+    - .gitignore

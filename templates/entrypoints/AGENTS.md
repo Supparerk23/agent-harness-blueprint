@@ -18,7 +18,7 @@ Before starting product work, install the harness:
 # /path/to/shared-agent-blueprints/scripts/agent install engineering --overlay gitlab --runtime all --target .
 ```
 
-`--runtime` may be `cursor`, `claude`, or `all` (default). Re-sync later with `scripts/agent sync --target .`.
+`--runtime` may be `cursor`, `claude`, or `all`. Omit it to pick interactively (Cursor and Claude are both optional). Re-sync later with `scripts/agent sync --target .`.
 
 ## Harness overview
 
@@ -35,10 +35,12 @@ Canonical sources live in the blueprint package under `harness/`. This repo only
 
 After `install --runtime …`:
 
-| Tool | Runtime root | Commands | Rules | Skills |
-|---|---|---|---|---|
-| Cursor | `.cursor/` | `.cursor/commands/` | `.cursor/rules/` | `.cursor/skills/` |
-| Claude Code | `.claude/` | `.claude/commands/` | `.claude/rules/` | `.claude/skills/` |
+| Tool | Runtime root | Commands | Rules | Skills | Templates |
+|---|---|---|---|---|---|
+| Cursor | `.cursor/` | `.cursor/commands/` | `.cursor/rules/` | `.cursor/skills/` | `.cursor/templates/` |
+| Claude Code | `.claude/` | `.claude/commands/` | `.claude/rules/` | `.claude/skills/` | `.claude/templates/` |
+
+Workflow templates (`adr`, `prd`, `review-checklist`) stay under the runtime — they are not copied to a project-root `templates/` folder.
 
 Agents that only read root markdown still get this contract from `AGENTS.md`. Claude Code also loads `CLAUDE.md` (thin pointer here).
 

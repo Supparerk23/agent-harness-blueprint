@@ -15,7 +15,8 @@ shift || true
 
 BLUEPRINT="default"
 OVERLAY=""
-RUNTIME="all"
+RUNTIME=""
+RUNTIME_SET=0
 DRY_RUN=0
 FORCE=0
 TARGET="."
@@ -23,7 +24,11 @@ TARGET="."
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --overlay) OVERLAY="${2:-}"; shift 2 ;;
-    --runtime) RUNTIME="${2:-}"; shift 2 ;;
+    --runtime)
+      RUNTIME="${2:-}"
+      RUNTIME_SET=1
+      shift 2
+      ;;
     --dry-run) DRY_RUN=1; shift ;;
     --force) FORCE=1; shift ;;
     --target) TARGET="${2:-.}"; shift 2 ;;
@@ -71,6 +76,80 @@ normalize_runtimes() {
     all) echo "cursor claude" ;;
     *) die "unknown runtime: $1 (cursor|claude|all)" ;;
   esac
+}
+
+runtime_available() {
+  case "$1" in
+    cursor)
+      command -v cursor >/dev/null 2>&1 || command -v cursor-agent >/dev/null 2>&1
+      ;;
+    claude)
+      command -v claude >/dev/null 2>&1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+runtime_hint() {
+  local name="$1"
+  if runtime_available "$name"; then
+    echo "detected on PATH"
+  else
+    echo "not detected on PATH (optional — install files only)"
+  fi
+}
+
+# Interactive / auto selector when --runtime was not passed.
+# Cursor and Claude are both optional; pick what this machine needs.
+select_runtime() {
+  if [[ "$RUNTIME_SET" -eq 1 ]]; then
+    [[ -n "$RUNTIME" ]] || die "--runtime requires a value (cursor|claude|all)"
+    return 0
+  fi
+
+  local cursor_hint claude_hint
+  cursor_hint="$(runtime_hint cursor)"
+  claude_hint="$(runtime_hint claude)"
+
+  # Non-interactive (CI / piped): auto-pick from PATH, never assume Cursor.
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    if runtime_available cursor && runtime_available claude; then
+      RUNTIME="all"
+    elif runtime_available claude; then
+      RUNTIME="claude"
+    elif runtime_available cursor; then
+      RUNTIME="cursor"
+    else
+      die "no --runtime and no TTY; pass --runtime cursor|claude|all"
+    fi
+    log "auto runtime (non-interactive): $RUNTIME"
+    return 0
+  fi
+
+  cat <<EOF
+
+Select AI runtime to install into the target project.
+(Neither tool is required on PATH — this only chooses which files to write.)
+
+  1) cursor   Cursor IDE        (.cursor/)  — ${cursor_hint}
+  2) claude   Claude Code       (.claude/)  — ${claude_hint}
+  3) all      Cursor + Claude   (both)
+  4) cancel
+
+EOF
+  local choice=""
+  while true; do
+    printf 'Runtime [1-4]: '
+    read -r choice || true
+    case "$choice" in
+      1|cursor|c) RUNTIME="cursor"; break ;;
+      2|claude) RUNTIME="claude"; break ;;
+      3|all|a) RUNTIME="all"; break ;;
+      4|q|cancel|"") die "cancelled (no runtime selected)" ;;
+      *) warn "invalid choice: $choice (use 1-4)" ;;
+    esac
+  done
+  log "selected runtime: $RUNTIME"
 }
 
 runtime_root_name() {
@@ -210,6 +289,56 @@ install_compat_docs() {
   copy_file "${ROOT}/templates/entrypoints/CLAUDE.md" "${dest_root}/CLAUDE.md"
 }
 
+# Merge consumer .gitignore fragment from templates/gitignore (idempotent).
+install_gitignore() {
+  local dest_root="$1"
+  local src="${ROOT}/templates/gitignore"
+  local dest="${dest_root}/.gitignore"
+  local begin="# --- shared-agent-blueprints (managed) ---"
+  local end="# --- end shared-agent-blueprints ---"
+
+  need_file "$src"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    if [[ -f "$dest" ]] && grep -qF "$begin" "$dest" 2>/dev/null; then
+      log "dry-run: would refresh managed .gitignore section in $dest"
+    elif [[ -f "$dest" ]]; then
+      log "dry-run: would append managed .gitignore section to $dest"
+    else
+      log "dry-run: would create $dest from templates/gitignore"
+    fi
+    return 0
+  fi
+
+  if [[ -f "$dest" ]] && grep -qF "$begin" "$dest" 2>/dev/null; then
+    # Refresh managed block in place (awk between markers)
+    local tmp
+    tmp="$(mktemp)"
+    awk -v begin="$begin" -v end="$end" -v src="$src" '
+      BEGIN {
+        while ((getline line < src) > 0) { block = block line "\n" }
+        close(src)
+      }
+      $0 == begin { print block; skip=1; next }
+      skip && $0 == end { skip=0; next }
+      skip { next }
+      { print }
+    ' "$dest" > "$tmp"
+    mv "$tmp" "$dest"
+    log "updated managed section: $dest"
+    return 0
+  fi
+
+  if [[ -f "$dest" ]]; then
+    printf '\n' >> "$dest"
+    cat "$src" >> "$dest"
+    log "appended managed section: $dest"
+  else
+    cp "$src" "$dest"
+    log "installed: $dest"
+  fi
+}
+
 install_gitlab_overlay_into() {
   local dest_commands="$1"
   local src="${ROOT}/blueprints/engineering/gitlab/commands"
@@ -303,8 +432,10 @@ cmd_init() {
   need_file "$MANIFEST"
   need_file "${ROOT}/templates/entrypoints/AGENTS.md"
   need_file "${ROOT}/templates/entrypoints/CLAUDE.md"
+  need_file "${ROOT}/templates/gitignore"
   install_compat_docs "$dest_root"
   install_memory_templates_if_absent "$dest_root"
+  install_gitignore "$dest_root"
   if [[ ! -f "${dest_root}/${STATE_FILE}" ]]; then
     write_state "$dest_root" "default" ""
   else
@@ -330,27 +461,34 @@ cmd_install() {
   need_file "${bp_dir}/blueprint.yaml"
   need_file "$MANIFEST"
 
+  select_runtime
+
   local runtimes
   runtimes="$(normalize_runtimes "$RUNTIME")"
 
   log "installing blueprint: $BLUEPRINT -> $dest_root (runtimes: $runtimes)"
   install_compat_docs "$dest_root"
   install_memory_templates_if_absent "$dest_root"
+  install_gitignore "$dest_root"
 
   local rt
   for rt in $runtimes; do
     install_runtime "$dest_root" "$rt"
     local rt_root
     rt_root="$(runtime_root_name "$rt")"
+    local rt_templates="${dest_root}/${rt_root}/templates"
+
+    # Agent-workflow templates stay inside the runtime (not project root).
+    mkdir -p "$rt_templates"
+    copy_file "${ROOT}/templates/review-checklist.md" "${rt_templates}/review-checklist.md"
+    copy_file "${ROOT}/templates/adr.md" "${rt_templates}/adr.md"
 
     case "$BLUEPRINT" in
       engineering)
         copy_file "${ROOT}/harness/commands/commit.md" "${dest_root}/${rt_root}/commands/commit.md"
         ;;
       startup)
-        mkdir -p "${dest_root}/templates"
-        copy_file "${ROOT}/templates/prd.md" "${dest_root}/templates/prd.md"
-        copy_file "${ROOT}/templates/adr.md" "${dest_root}/templates/adr.md"
+        copy_file "${ROOT}/templates/prd.md" "${rt_templates}/prd.md"
         ;;
     esac
 
@@ -358,11 +496,6 @@ cmd_install() {
       install_gitlab_overlay_into "${dest_root}/${rt_root}/commands"
     fi
   done
-
-  # Shared templates useful for all installs
-  mkdir -p "${dest_root}/templates"
-  copy_file "${ROOT}/templates/review-checklist.md" "${dest_root}/templates/review-checklist.md"
-  copy_file "${ROOT}/templates/adr.md" "${dest_root}/templates/adr.md"
 
   write_state "$dest_root" "$BLUEPRINT" "$runtimes"
   log "install complete"
@@ -401,20 +534,23 @@ cmd_sync() {
     if [[ -n "$ov" && "$ov" != "null" ]]; then
       OVERLAY="$ov"
     fi
-    # Only override RUNTIME from state when caller left default "all"
-    # and state has an explicit list — sync should re-apply installed runtimes.
-    local state_rts
-    state_rts="$(read_state_runtimes "$state")"
-    if [[ -n "$state_rts" ]]; then
-      if [[ "$state_rts" == *"cursor"* && "$state_rts" == *"claude"* ]]; then
-        RUNTIME="all"
+    # Re-apply previously installed runtimes unless caller passed --runtime.
+    if [[ "$RUNTIME_SET" -eq 0 ]]; then
+      local state_rts
+      state_rts="$(read_state_runtimes "$state")"
+      if [[ -n "$state_rts" ]]; then
+        if [[ "$state_rts" == *"cursor"* && "$state_rts" == *"claude"* ]]; then
+          RUNTIME="all"
+        else
+          RUNTIME="$(echo "$state_rts" | awk '{print $1}')"
+        fi
+        RUNTIME_SET=1
       else
-        # single runtime name
-        RUNTIME="$(echo "$state_rts" | awk '{print $1}')"
+        die "no runtimes in ${STATE_FILE}; run: scripts/agent install <blueprint>"
       fi
-    else
-      die "no runtimes in ${STATE_FILE}; run: scripts/agent install <blueprint> --runtime all"
     fi
+  elif [[ "$RUNTIME_SET" -eq 0 ]]; then
+    die "no ${STATE_FILE}; run: scripts/agent init && scripts/agent install <blueprint>"
   fi
   BLUEPRINT="$bp"
   log "syncing blueprint: $BLUEPRINT runtime=$RUNTIME (preserve-local)"
@@ -535,7 +671,7 @@ usage() {
 Usage: scripts/agent <command> [blueprint] [flags]
 
 Commands:
-  init                 Write AGENTS.md, CLAUDE.md, memory files (no tool runtime)
+  init                 Write AGENTS.md, CLAUDE.md, memory, .gitignore (no tool runtime)
   install <blueprint>  Install blueprint into --target runtimes
   update               Show update plan vs package VERSION
   sync                 Re-apply installed blueprint with preserve-local
@@ -546,7 +682,8 @@ Blueprints:
 
 Flags:
   --overlay gitlab     Install GitLab/glab command overlay
-  --runtime NAME       cursor | claude | all (default: all)
+  --runtime NAME       cursor | claude | all
+                       (omit to get an interactive selector; both tools optional)
   --target PATH        Consumer project root (default .)
   --dry-run            Print actions without writing
   --force              Overwrite unmanaged files

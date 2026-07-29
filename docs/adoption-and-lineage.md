@@ -14,6 +14,7 @@ That writes consumer-only artifacts into the target:
 
 - `AGENTS.md` / `CLAUDE.md` from `templates/entrypoints/` (shared AI workflow contract)
 - memory files from `templates/memory/` if absent
+- managed `.gitignore` section from `templates/gitignore` (local overrides + conflict siblings)
 - `.cursor/` and/or `.claude/` from `harness/` + selected blueprint/overlay (`--runtime`)
 - install state `.agent-blueprint.yaml`
 

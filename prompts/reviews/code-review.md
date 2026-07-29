@@ -15,4 +15,4 @@ Review the current branch or selected diff.
 - Non-blocking suggestions
 - Explicit “looks good” only when no blocking issues remain
 
-Use `templates/review-checklist.md` when available.
+Use `<runtime>/templates/review-checklist.md` when available (`.cursor/templates/` or `.claude/templates/`).

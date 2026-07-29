@@ -73,9 +73,9 @@ scripts/agent install default --runtime all --target /path/to/your-repo
 
 | Step | Result |
 |---|---|
-| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons — **no** tool runtime yet |
-| `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` |
-| `--runtime` | `cursor` \| `claude` \| `all` (default) |
+| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
+| `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` (prompts for runtime if `--runtime` omitted) |
+| `--runtime` | `cursor` \| `claude` \| `all` — both tools optional; omit for interactive selector |
 
 | Blueprint | Use when |
 |---|---|

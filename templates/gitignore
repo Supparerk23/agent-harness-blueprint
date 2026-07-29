@@ -1,0 +1,15 @@
+# --- shared-agent-blueprints (managed) ---
+# Local overrides and install conflict siblings — keep out of git.
+.cursor/
+.claude/
+PLANNING.md
+DECISIONS.md
+RUN_LOG.md
+HOTCACHE.md
+LEARNING.md
+ANTI-PATTERNS.md
+*.blueprint-conflict
+.agent-blueprint.local.yaml
+AGENTS.local.md
+CLAUDE.local.md
+# --- end shared-agent-blueprints ---

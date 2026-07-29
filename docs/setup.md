@@ -36,11 +36,11 @@ scripts/agent sync --target /path/to/your-repo
 
 | Step | Writes | Does not write |
 |---|---|---|
-| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons, `.agent-blueprint.yaml`, local override stub | `.cursor/`, `.claude/` |
+| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons, managed `.gitignore` section, `.agent-blueprint.yaml`, local override stub | `.cursor/`, `.claude/` |
 | `install` | Selected blueprint into `--runtime` roots; refresh managed entrypoints | Existing memory file **content** |
 | `sync` | Re-applies installed blueprint + runtimes (`preserve-local`) | Unmanaged / local overrides |
 
-`--runtime`: `cursor` | `claude` | `all` (default).
+`--runtime`: `cursor` | `claude` | `all`. If omitted, `install` shows an interactive selector (Cursor and Claude are both optional). Non-interactive shells auto-pick from PATH or require `--runtime`.
 
 ## Blueprints
 

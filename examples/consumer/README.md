@@ -48,7 +48,9 @@ overrides:
 
 ## What gets copied vs what stays local
 
-**Copied (managed):** `.cursor/` and/or `.claude/` commands, skills, rules from selected blueprint; `AGENTS.md`, `CLAUDE.md` from `templates/entrypoints/`; `templates/review-checklist.md`.
+**Copied (managed):** `.cursor/` and/or `.claude/` commands, skills, rules, and `templates/` (agent-workflow only) from selected blueprint; `AGENTS.md`, `CLAUDE.md` from `templates/entrypoints/`.
+
+Workflow docs such as `review-checklist.md` / `adr.md` land under `.cursor/templates/` or `.claude/templates/` — not the project root.
 
 **Local state (created in the consumer, never part of the blueprint package):** `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`, `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md`, `ARCHITECTURE.md`.
 

@@ -29,7 +29,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 
 ## How adopting projects work
 
-1. Run `scripts/agent init --target /path/to/repo` — writes `AGENTS.md`, `CLAUDE.md`, and memory skeletons (no tool runtime yet).
+1. Run `scripts/agent init --target /path/to/repo` — writes `AGENTS.md`, `CLAUDE.md`, memory skeletons, and a managed `.gitignore` section from `templates/gitignore` (no tool runtime yet).
 2. Run `scripts/agent install <blueprint> --runtime all --target /path/to/repo` — projects `harness/` into `.cursor/` and/or `.claude/`.
 3. Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) always win over managed files.
 4. Memory state files are never overwritten by install/sync when they already exist in the target.
@@ -41,3 +41,6 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 | `harness/commands/*.md` | `.cursor/commands/` | `.claude/commands/` |
 | `harness/skills/*/` | `.cursor/skills/` | `.claude/skills/` |
 | `harness/rules/*.mdc` | `.cursor/rules/*.mdc` | `.claude/rules/*.md` |
+| `templates/adr.md`, `review-checklist.md`, … | `.cursor/templates/` | `.claude/templates/` |
+
+Workflow templates (`adr`, `prd`, `review-checklist`) live **inside the runtime** only — they are not copied to the project root `templates/` folder.

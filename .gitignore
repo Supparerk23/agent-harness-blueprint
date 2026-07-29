@@ -11,7 +11,6 @@ RUN_LOG.md
 HOTCACHE.md
 LEARNING.md
 ANTI-PATTERNS.md
-ARCHITECTURE.md
 .agent-blueprint.yaml
 .agent-blueprint.local.yaml
 AGENTS.local.md
