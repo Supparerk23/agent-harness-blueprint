@@ -1,0 +1,1157 @@
+#!/usr/bin/env bash
+# Lightweight package-manager style CLI for shared-agent-blueprints.
+# Usage: ./blueprint {init|install|update|sync|doctor} [blueprint] [--overlay NAME] [--runtime NAME] [--dry-run] [--force]
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION_FILE="${ROOT}/VERSION"
+MANIFEST="${ROOT}/manifest.yaml"
+STATE_FILE=".agent-blueprint.yaml"
+LOCAL_OVERRIDE=".agent-blueprint.local.yaml"
+MARKER="<!-- managed-by: shared-agent-blueprints -->"
+
+cmd="${1:-}"
+# Flags-only invocation (e.g. ./blueprint --target ./repo) opens the menu.
+if [[ -n "$cmd" && "$cmd" == -* && "$cmd" != -h && "$cmd" != --help ]]; then
+  cmd="menu"
+else
+  shift || true
+fi
+
+BLUEPRINT="default"
+OVERLAY=""
+RUNTIME=""
+RUNTIME_SET=0
+DRY_RUN=0
+FORCE=0
+TARGET="."
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --overlay) OVERLAY="${2:-}"; shift 2 ;;
+    --runtime)
+      RUNTIME="${2:-}"
+      RUNTIME_SET=1
+      shift 2
+      ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --force) FORCE=1; shift ;;
+    --target) TARGET="${2:-.}"; shift 2 ;;
+    -*)
+      echo "unknown flag: $1" >&2
+      exit 2
+      ;;
+    *)
+      BLUEPRINT="$1"
+      shift
+      ;;
+  esac
+done
+
+log() { printf '%s\n' "$*"; }
+warn() { printf 'warn: %s\n' "$*" >&2; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+# Modern terminal chrome (Claude-style). Colors only when stdout is a TTY.
+ui_color() {
+  if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+    case "$1" in
+      reset) printf '\033[0m' ;;
+      dim) printf '\033[2m' ;;
+      bold) printf '\033[1m' ;;
+      green) printf '\033[32m' ;;
+      red) printf '\033[31m' ;;
+      yellow) printf '\033[33m' ;;
+      cyan) printf '\033[36m' ;;
+      magenta) printf '\033[35m' ;;
+    esac
+  fi
+}
+
+ui_rule() {
+  printf '%s────────────────────────────────────────────────────────%s\n' "$(ui_color dim)" "$(ui_color reset)"
+}
+
+ui_header() {
+  local title="$1"
+  printf '\n'
+  ui_rule
+  printf '  %s✦ %s%s\n' "$(ui_color bold)$(ui_color cyan)" "$title" "$(ui_color reset)"
+  ui_rule
+}
+
+ui_kv() {
+  printf '  %s%-10s%s %s\n' "$(ui_color dim)" "$1" "$(ui_color reset)" "$2"
+}
+
+ui_section() {
+  printf '\n  %s%s%s\n' "$(ui_color bold)" "$1" "$(ui_color reset)"
+}
+
+ui_ok() {
+  printf '  %s✅%s  %s\n' "$(ui_color green)" "$(ui_color reset)" "$*"
+}
+
+ui_fail() {
+  printf '  %s❌%s  %s\n' "$(ui_color red)" "$(ui_color reset)" "$*" >&2
+}
+
+ui_info() {
+  printf '  %sℹ️ %s  %s\n' "$(ui_color yellow)" "$(ui_color reset)" "$*"
+}
+
+ui_skip() {
+  printf '  %s○%s   %s\n' "$(ui_color dim)" "$(ui_color reset)" "$*"
+}
+
+ui_next() {
+  printf '  %s→%s  %s\n' "$(ui_color cyan)" "$(ui_color reset)" "$*"
+}
+
+ui_footer_ok() {
+  printf '\n'
+  ui_rule
+  printf '  %s✅  Healthy%s — ready to work\n' "$(ui_color green)$(ui_color bold)" "$(ui_color reset)"
+  ui_rule
+  printf '\n'
+}
+
+ui_footer_fail() {
+  local n="$1"
+  printf '\n'
+  ui_rule
+  printf '  %s❌  %s issue(s)%s — fix, then re-run doctor\n' "$(ui_color red)$(ui_color bold)" "$n" "$(ui_color reset)"
+  ui_rule
+  printf '\n'
+}
+
+need_file() {
+  [[ -f "$1" ]] || die "missing required file: $1"
+}
+
+package_version() {
+  if [[ -f "$VERSION_FILE" ]]; then
+    tr -d '[:space:]' < "$VERSION_FILE"
+  else
+    echo "0.0.0"
+  fi
+}
+
+resolve_blueprint_dir() {
+  local name="$1"
+  case "$name" in
+    default) echo "${ROOT}/blueprints/default" ;;
+    engineering) echo "${ROOT}/blueprints/engineering" ;;
+    startup) echo "${ROOT}/blueprints/startup" ;;
+    *) die "unknown blueprint: $name (default|engineering|startup)" ;;
+  esac
+}
+
+normalize_runtimes() {
+  case "$1" in
+    cursor) echo "cursor" ;;
+    claude) echo "claude" ;;
+    all) echo "cursor claude" ;;
+    *) die "unknown runtime: $1 (cursor|claude|all)" ;;
+  esac
+}
+
+runtime_available() {
+  case "$1" in
+    cursor)
+      command -v cursor >/dev/null 2>&1 || command -v cursor-agent >/dev/null 2>&1
+      ;;
+    claude)
+      command -v claude >/dev/null 2>&1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+runtime_hint() {
+  local name="$1"
+  if runtime_available "$name"; then
+    echo "detected on PATH"
+  else
+    echo "not detected on PATH (optional — install files only)"
+  fi
+}
+
+# Interactive / auto selector when --runtime was not passed.
+# Cursor and Claude are both optional; pick what this machine needs.
+# Returns 1 if the user cancels.
+select_runtime() {
+  if [[ "$RUNTIME_SET" -eq 1 ]]; then
+    [[ -n "$RUNTIME" ]] || die "--runtime requires a value (cursor|claude|all)"
+    return 0
+  fi
+
+  local cursor_hint claude_hint
+  cursor_hint="$(runtime_hint cursor)"
+  claude_hint="$(runtime_hint claude)"
+
+  # Non-interactive (CI / piped): auto-pick from PATH, never assume Cursor.
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    if runtime_available cursor && runtime_available claude; then
+      RUNTIME="all"
+    elif runtime_available claude; then
+      RUNTIME="claude"
+    elif runtime_available cursor; then
+      RUNTIME="cursor"
+    else
+      die "no --runtime and no TTY; pass --runtime cursor|claude|all"
+    fi
+    log "auto runtime (non-interactive): $RUNTIME"
+    return 0
+  fi
+
+  cat <<EOF
+
+Select AI runtime to install into the target project.
+(Neither tool is required on PATH — this only chooses which files to write.)
+
+  1) cursor   Cursor IDE        (.cursor/)  — ${cursor_hint}
+  2) claude   Claude Code       (.claude/)  — ${claude_hint}
+  3) all      Cursor + Claude   (both)
+  4) cancel
+
+EOF
+  local choice=""
+  while true; do
+    printf 'Runtime [1-4]: '
+    read -r choice || true
+    case "$choice" in
+      1|cursor|c) RUNTIME="cursor"; break ;;
+      2|claude) RUNTIME="claude"; break ;;
+      3|all|a) RUNTIME="all"; break ;;
+      4|q|cancel|"") return 1 ;;
+      *) warn "invalid choice: $choice (use 1-4)" ;;
+    esac
+  done
+  log "selected runtime: $RUNTIME"
+  return 0
+}
+
+runtime_root_name() {
+  case "$1" in
+    cursor) echo ".cursor" ;;
+    claude) echo ".claude" ;;
+    *) die "unknown runtime: $1" ;;
+  esac
+}
+
+copy_file() {
+  local src="$1"
+  local dest="$2"
+  local mode="${3:-managed}" # managed | preserve | force
+
+  if [[ ! -f "$src" ]]; then
+    warn "skip missing source: $src"
+    return 0
+  fi
+
+  if [[ -f "$dest" && "$mode" != "force" ]]; then
+    if [[ "$mode" == "preserve" ]]; then
+      log "preserve: $dest"
+      return 0
+    fi
+    if [[ "$FORCE" -ne 1 ]]; then
+      if grep -qF "$MARKER" "$dest" 2>/dev/null; then
+        :
+      else
+        # Local/unmanaged file: write conflict sibling instead of overwriting
+        local conflict="${dest}.blueprint-conflict"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+          log "dry-run conflict: would write $conflict (keep $dest)"
+          return 0
+        fi
+        mkdir -p "$(dirname "$dest")"
+        cp "$src" "$conflict"
+        warn "conflict: kept $dest; wrote candidate to $conflict"
+        return 0
+      fi
+    fi
+  fi
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "dry-run copy: $src -> $dest"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest"
+  # Append managed marker for markdown-like files once
+  case "$dest" in
+    *.md|*.mdc)
+      if ! grep -qF "$MARKER" "$dest" 2>/dev/null; then
+        printf '\n%s\n' "$MARKER" >> "$dest"
+      fi
+      ;;
+  esac
+  log "installed: $dest"
+}
+
+install_skills_into() {
+  local dest_skills="$1"
+  local skill
+  for skill in memory-system-protocol planning-execution-tracking docs-style skill-creator refactor-code; do
+    if [[ -d "${ROOT}/harness/skills/${skill}" ]]; then
+      mkdir -p "${dest_skills}/${skill}"
+      # shellcheck disable=SC2044
+      for f in $(find "${ROOT}/harness/skills/${skill}" -type f); do
+        rel="${f#"${ROOT}/harness/skills/${skill}/"}"
+        copy_file "$f" "${dest_skills}/${skill}/${rel}"
+      done
+    fi
+  done
+}
+
+install_rules_into() {
+  local dest_rules="$1"
+  local runtime="$2"
+  local src_rule dest_name
+  for src_rule in safety-rules.mdc planning-execution-tracking.mdc; do
+    if [[ "$runtime" == "claude" ]]; then
+      dest_name="${src_rule%.mdc}.md"
+    else
+      dest_name="$src_rule"
+    fi
+    copy_file "${ROOT}/harness/rules/${src_rule}" "${dest_rules}/${dest_name}"
+  done
+}
+
+install_commands_into() {
+  local dest_commands="$1"
+  shift
+  local name
+  for name in "$@"; do
+    copy_file "${ROOT}/harness/commands/${name}" "${dest_commands}/${name}"
+  done
+}
+
+install_runtime() {
+  local dest_root="$1"
+  local runtime="$2"
+  local rt_root
+  rt_root="$(runtime_root_name "$runtime")"
+  local base="${dest_root}/${rt_root}"
+
+  install_commands_into "${base}/commands" start.md review.md commit.md
+  install_rules_into "${base}/rules" "$runtime"
+  install_skills_into "${base}/skills"
+}
+
+install_memory_templates_if_absent() {
+  local dest_root="$1"
+  local map=(
+    "templates/memory/planning.md:PLANNING.md"
+    "templates/memory/decisions.md:DECISIONS.md"
+    "templates/memory/run-log.md:RUN_LOG.md"
+    "templates/memory/hotcache.md:HOTCACHE.md"
+    "templates/memory/anti-patterns.md:ANTI-PATTERNS.md"
+    "templates/memory/learning.md:LEARNING.md"
+  )
+  local entry src dest
+  for entry in "${map[@]}"; do
+    src="${ROOT}/${entry%%:*}"
+    dest="${dest_root}/${entry##*:}"
+    if [[ -f "$dest" ]]; then
+      log "preserve local state: $dest"
+    else
+      copy_file "$src" "$dest" force
+    fi
+  done
+}
+
+install_compat_docs() {
+  local dest_root="$1"
+  copy_file "${ROOT}/templates/entrypoints/AGENTS.md" "${dest_root}/AGENTS.md"
+  copy_file "${ROOT}/templates/entrypoints/CLAUDE.md" "${dest_root}/CLAUDE.md"
+}
+
+# Merge consumer .gitignore fragment from templates/gitignore (idempotent).
+install_gitignore() {
+  local dest_root="$1"
+  local src="${ROOT}/templates/gitignore"
+  local dest="${dest_root}/.gitignore"
+  local begin="# --- shared-agent-blueprints (managed) ---"
+  local end="# --- end shared-agent-blueprints ---"
+
+  need_file "$src"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    if [[ -f "$dest" ]] && grep -qF "$begin" "$dest" 2>/dev/null; then
+      log "dry-run: would refresh managed .gitignore section in $dest"
+    elif [[ -f "$dest" ]]; then
+      log "dry-run: would append managed .gitignore section to $dest"
+    else
+      log "dry-run: would create $dest from templates/gitignore"
+    fi
+    return 0
+  fi
+
+  if [[ -f "$dest" ]] && grep -qF "$begin" "$dest" 2>/dev/null; then
+    # Refresh managed block in place (awk between markers)
+    local tmp
+    tmp="$(mktemp)"
+    awk -v begin="$begin" -v end="$end" -v src="$src" '
+      BEGIN {
+        while ((getline line < src) > 0) { block = block line "\n" }
+        close(src)
+      }
+      $0 == begin { print block; skip=1; next }
+      skip && $0 == end { skip=0; next }
+      skip { next }
+      { print }
+    ' "$dest" > "$tmp"
+    mv "$tmp" "$dest"
+    log "updated managed section: $dest"
+    return 0
+  fi
+
+  if [[ -f "$dest" ]]; then
+    printf '\n' >> "$dest"
+    cat "$src" >> "$dest"
+    log "appended managed section: $dest"
+  else
+    cp "$src" "$dest"
+    log "installed: $dest"
+  fi
+}
+
+install_gitlab_overlay_into() {
+  local dest_commands="$1"
+  local src="${ROOT}/blueprints/engineering/gitlab/commands"
+  local f
+  for f in prerequisite.md pr.md fix-comment.md sync-dev.md; do
+    copy_file "${src}/${f}" "${dest_commands}/${f}"
+  done
+}
+
+package_source_ref() {
+  # Prefer a portable repository identity over a machine-local path.
+  # Examples: https://github.com/org/agent-harness-blueprint
+  #           git@github.com:org/agent-harness-blueprint.git
+  # Fallback: manifest name, then absolute package path.
+  local url=""
+  if command -v git >/dev/null 2>&1 && [[ -d "${ROOT}/.git" || -f "${ROOT}/.git" ]]; then
+    url="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
+  fi
+  if [[ -n "$url" ]]; then
+    # Normalize common git SSH / HTTPS shapes to a stable https URL when possible.
+    case "$url" in
+      git@github.com:*)
+        url="https://github.com/${url#git@github.com:}"
+        url="${url%.git}"
+        ;;
+      git@gitlab.com:*)
+        url="https://gitlab.com/${url#git@gitlab.com:}"
+        url="${url%.git}"
+        ;;
+      https://github.com/*|http://github.com/*|https://gitlab.com/*|http://gitlab.com/*)
+        url="${url%.git}"
+        ;;
+      *.git)
+        url="${url%.git}"
+        ;;
+    esac
+    echo "$url"
+    return 0
+  fi
+  if [[ -f "$MANIFEST" ]]; then
+    local name
+    name="$(grep -E '^name:' "$MANIFEST" | head -1 | awk '{print $2}')"
+    if [[ -n "$name" ]]; then
+      echo "$name"
+      return 0
+    fi
+  fi
+  echo "$ROOT"
+}
+
+write_state() {
+  local dest_root="$1"
+  local bp="$2"
+  local runtimes_csv="$3"
+  local ver
+  ver="$(package_version)"
+  local src_ref
+  src_ref="$(package_source_ref)"
+  local out="${dest_root}/${STATE_FILE}"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "dry-run state: $out (source=$src_ref blueprint=$bp version=$ver runtimes=$runtimes_csv)"
+    return 0
+  fi
+  # YAML list from space-separated runtimes
+  local rt_yaml=""
+  local r
+  for r in $runtimes_csv; do
+    rt_yaml="${rt_yaml}
+  - ${r}"
+  done
+  cat > "$out" <<EOF
+# Generated by ./blueprint — do not commit secrets here.
+# source is a portable repo/package identity (not a machine-local path).
+source: ${src_ref}
+version: ${ver}
+blueprint: ${bp}
+overlay: ${OVERLAY:-null}
+runtimes:${rt_yaml}
+installed_at_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+conflict_policy: preserve-local
+EOF
+  log "wrote: $out"
+}
+
+read_state_field() {
+  local state="$1"
+  local field="$2"
+  local default="${3:-}"
+  if [[ -f "$state" ]]; then
+    grep -E "^${field}:" "$state" | head -1 | awk '{print $2}'
+  else
+    echo "$default"
+  fi
+}
+
+read_state_runtimes() {
+  local state="$1"
+  if [[ ! -f "$state" ]]; then
+    echo ""
+    return 0
+  fi
+  # Prefer explicit runtimes list; fall back to legacy runtime_root
+  local has_runtimes_key=0
+  local listed
+  listed="$(awk '
+    /^runtimes:/ { in_rt=1; print "__KEY__"; next }
+    in_rt && /^  - / { gsub(/^  - /,""); print; next }
+    in_rt && /^[^ ]/ { in_rt=0 }
+  ' "$state")"
+  if echo "$listed" | grep -q '^__KEY__$'; then
+    has_runtimes_key=1
+    listed="$(echo "$listed" | grep -v '^__KEY__$')"
+  fi
+  if [[ "$has_runtimes_key" -eq 1 ]]; then
+    # May be empty after init (no tool runtime yet)
+    if [[ -z "$listed" ]]; then
+      echo ""
+    else
+      echo "$listed" | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+    fi
+    return 0
+  fi
+  local legacy
+  legacy="$(read_state_field "$state" runtime_root "")"
+  case "$legacy" in
+    .cursor) echo "cursor" ;;
+    .claude) echo "claude" ;;
+    *) echo "" ;;
+  esac
+}
+
+cmd_init() {
+  local dest_root="$TARGET"
+  mkdir -p "$dest_root"
+  need_file "$MANIFEST"
+  need_file "${ROOT}/templates/entrypoints/AGENTS.md"
+  need_file "${ROOT}/templates/entrypoints/CLAUDE.md"
+  need_file "${ROOT}/templates/gitignore"
+  install_compat_docs "$dest_root"
+  install_memory_templates_if_absent "$dest_root"
+  install_gitignore "$dest_root"
+  if [[ ! -f "${dest_root}/${STATE_FILE}" ]]; then
+    write_state "$dest_root" "default" ""
+  else
+    log "preserve: ${dest_root}/${STATE_FILE}"
+  fi
+  if [[ ! -f "${dest_root}/${LOCAL_OVERRIDE}" && "$DRY_RUN" -eq 0 ]]; then
+    cat > "${dest_root}/${LOCAL_OVERRIDE}" <<'EOF'
+# Local overrides (not managed). Example:
+# variables:
+#   forge: github
+#   integration_branch: develop
+#   test_command: "uv run pytest"
+EOF
+    log "wrote: ${dest_root}/${LOCAL_OVERRIDE}"
+  fi
+  log "init complete (shared entrypoints + memory; run install --runtime to project tool runtimes)"
+}
+
+cmd_install() {
+  local dest_root="$TARGET"
+  local bp_dir
+  bp_dir="$(resolve_blueprint_dir "$BLUEPRINT")"
+  need_file "${bp_dir}/blueprint.yaml"
+  need_file "$MANIFEST"
+
+  select_runtime || die "cancelled (no runtime selected)"
+
+  local runtimes
+  runtimes="$(normalize_runtimes "$RUNTIME")"
+
+  log "installing blueprint: $BLUEPRINT -> $dest_root (runtimes: $runtimes)"
+  install_compat_docs "$dest_root"
+  install_memory_templates_if_absent "$dest_root"
+  install_gitignore "$dest_root"
+
+  local rt
+  for rt in $runtimes; do
+    install_runtime "$dest_root" "$rt"
+    local rt_root
+    rt_root="$(runtime_root_name "$rt")"
+    local rt_templates="${dest_root}/${rt_root}/templates"
+
+    # Agent-workflow templates stay inside the runtime (not project root).
+    mkdir -p "$rt_templates"
+    copy_file "${ROOT}/templates/review-checklist.md" "${rt_templates}/review-checklist.md"
+    copy_file "${ROOT}/templates/adr.md" "${rt_templates}/adr.md"
+
+    case "$BLUEPRINT" in
+      engineering)
+        copy_file "${ROOT}/harness/commands/commit.md" "${dest_root}/${rt_root}/commands/commit.md"
+        ;;
+      startup)
+        copy_file "${ROOT}/templates/prd.md" "${rt_templates}/prd.md"
+        ;;
+    esac
+
+    if [[ "$OVERLAY" == "gitlab" ]]; then
+      install_gitlab_overlay_into "${dest_root}/${rt_root}/commands"
+    fi
+  done
+
+  write_state "$dest_root" "$BLUEPRINT" "$runtimes"
+  log "install complete"
+}
+
+cmd_update() {
+  local dest_root="$TARGET"
+  local state="${dest_root}/${STATE_FILE}"
+  local current="unknown"
+  local latest
+  latest="$(package_version)"
+  if [[ -f "$state" ]]; then
+    current="$(read_state_field "$state" version unknown)"
+  fi
+  log "installed version: ${current}"
+  log "package version:   ${latest}"
+  if [[ "$current" == "$latest" ]]; then
+    log "already up to date"
+    return 0
+  fi
+  log "update plan:"
+  log "  1. re-run: ./blueprint sync --dry-run"
+  log "  2. review conflicts (*.blueprint-conflict)"
+  log "  3. apply:  ./blueprint sync"
+  log "  4. verify: ./blueprint doctor"
+}
+
+cmd_sync() {
+  local dest_root="$TARGET"
+  local state="${dest_root}/${STATE_FILE}"
+  local bp="default"
+  if [[ -f "$state" ]]; then
+    bp="$(read_state_field "$state" blueprint default)"
+    local ov
+    ov="$(read_state_field "$state" overlay "")"
+    if [[ -n "$ov" && "$ov" != "null" ]]; then
+      OVERLAY="$ov"
+    fi
+    # Re-apply previously installed runtimes unless caller passed --runtime.
+    if [[ "$RUNTIME_SET" -eq 0 ]]; then
+      local state_rts
+      state_rts="$(read_state_runtimes "$state")"
+      if [[ -n "$state_rts" ]]; then
+        if [[ "$state_rts" == *"cursor"* && "$state_rts" == *"claude"* ]]; then
+          RUNTIME="all"
+        else
+          RUNTIME="$(echo "$state_rts" | awk '{print $1}')"
+        fi
+        RUNTIME_SET=1
+      else
+        die "no runtimes in ${STATE_FILE}; run: ./blueprint install <blueprint>"
+      fi
+    fi
+  elif [[ "$RUNTIME_SET" -eq 0 ]]; then
+    die "no ${STATE_FILE}; run: ./blueprint init && ./blueprint install <blueprint>"
+  fi
+  BLUEPRINT="$bp"
+  log "syncing blueprint: $BLUEPRINT runtime=$RUNTIME (preserve-local)"
+  cmd_install
+}
+
+cmd_doctor() {
+  local dest_root="$TARGET"
+  local errors=0
+  local package_mode=0
+  # Resolve absolute paths for comparison when possible
+  local abs_dest abs_root
+  abs_dest="$(cd "$dest_root" 2>/dev/null && pwd || echo "$dest_root")"
+  abs_root="$(cd "$ROOT" 2>/dev/null && pwd || echo "$ROOT")"
+  if [[ "$abs_dest" == "$abs_root" ]]; then
+    package_mode=1
+  fi
+
+  need_file "$MANIFEST"
+  need_file "$VERSION_FILE"
+
+  ui_header "Doctor"
+  ui_kv "package" "$(package_version)"
+  ui_kv "manifest" "$MANIFEST"
+  if [[ "$package_mode" -eq 1 ]]; then
+    ui_kv "mode" "package-source"
+  else
+    ui_kv "mode" "consumer-target"
+  fi
+  ui_kv "target" "$abs_dest"
+
+  ui_section "Package"
+  for d in blueprints/default harness/commands harness/rules harness/skills templates/memory templates/entrypoints prompts/system; do
+    if [[ ! -e "${ROOT}/$d" ]]; then
+      ui_fail "missing $d"
+      errors=$((errors + 1))
+    else
+      ui_ok "$d"
+    fi
+  done
+  if [[ -x "${ROOT}/blueprint" ]]; then
+    ui_ok "blueprint (CLI)"
+  else
+    ui_fail "missing executable ./blueprint"
+    errors=$((errors + 1))
+  fi
+
+  if [[ "$package_mode" -eq 1 ]]; then
+    ui_section "Package hygiene"
+    for bad in .cursor .claude PLANNING.md DECISIONS.md RUN_LOG.md HOTCACHE.md LEARNING.md ANTI-PATTERNS.md; do
+      if [[ -e "${dest_root}/${bad}" ]]; then
+        ui_fail "should not contain consumer artifact: $bad"
+        errors=$((errors + 1))
+      else
+        ui_ok "no $bad"
+      fi
+    done
+    ui_section "Entrypoints"
+    for f in AGENTS.md CLAUDE.md; do
+      if [[ -f "${dest_root}/$f" ]]; then
+        ui_ok "$f"
+      else
+        ui_fail "missing $f"
+        errors=$((errors + 1))
+      fi
+    done
+  else
+    local state="${dest_root}/${STATE_FILE}"
+    local has_agents=0 has_claude=0 has_state=0
+    [[ -f "${dest_root}/AGENTS.md" ]] && has_agents=1
+    [[ -f "${dest_root}/CLAUDE.md" ]] && has_claude=1
+    [[ -f "$state" ]] && has_state=1
+
+    ui_section "Consumer install"
+    if [[ "$has_state" -eq 0 && "$has_agents" -eq 0 ]]; then
+      ui_fail "not initialized"
+      printf '\n'
+      ui_next "menu → 1) init"
+      ui_next "menu → 2) install  (blueprint + runtime)"
+      ui_next "menu → 5) doctor   (re-check)"
+      printf '\n'
+      ui_info "CLI: ./blueprint init --target ${abs_dest}"
+      ui_info "CLI: ./blueprint install default --runtime all --target ${abs_dest}"
+      errors=$((errors + 1))
+    else
+      if [[ "$has_state" -eq 1 ]]; then
+        ui_ok "${STATE_FILE}"
+      else
+        ui_fail "missing ${STATE_FILE}  (run init, then install)"
+        errors=$((errors + 1))
+      fi
+      if [[ "$has_agents" -eq 1 ]]; then
+        ui_ok "AGENTS.md"
+      else
+        ui_fail "missing AGENTS.md  (run init)"
+        errors=$((errors + 1))
+      fi
+      if [[ "$has_claude" -eq 1 ]]; then
+        ui_ok "CLAUDE.md"
+      else
+        ui_fail "missing CLAUDE.md  (run init)"
+        errors=$((errors + 1))
+      fi
+
+      ui_section "Runtimes"
+      local declared
+      declared="$(read_state_runtimes "$state")"
+      if [[ -z "$declared" ]]; then
+        ui_fail "no tool runtime installed yet"
+        ui_next "menu → 2) install"
+        errors=$((errors + 1))
+      else
+        local found_runtime=0
+        local rt rt_root
+        for rt in cursor claude; do
+          rt_root="$(runtime_root_name "$rt")"
+          if [[ -d "${dest_root}/${rt_root}" ]]; then
+            if echo " $declared " | grep -q " $rt "; then
+              ui_ok "${rt_root}  (declared)"
+              found_runtime=1
+            else
+              ui_info "${rt_root} present but not declared in state"
+            fi
+          else
+            if echo " $declared " | grep -q " $rt "; then
+              ui_fail "${rt_root} declared but missing  (re-run install)"
+              errors=$((errors + 1))
+            else
+              ui_skip "${rt_root} not installed"
+            fi
+          fi
+        done
+        if [[ "$found_runtime" -eq 0 ]]; then
+          ui_fail "no declared tool runtime directory found"
+          errors=$((errors + 1))
+        fi
+      fi
+    fi
+  fi
+
+  ui_section "Tooling"
+  if command -v glab >/dev/null 2>&1; then
+    ui_ok "glab"
+  else
+    ui_skip "glab not found (only needed for GitLab overlay)"
+  fi
+  if command -v gh >/dev/null 2>&1; then
+    ui_ok "gh"
+  else
+    ui_skip "gh not found (only needed for GitHub workflows)"
+  fi
+
+  if [[ "$errors" -gt 0 ]]; then
+    ui_footer_fail "$errors"
+    exit 1
+  fi
+  ui_footer_ok
+}
+
+usage() {
+  cat <<'EOF'
+Usage: ./blueprint [<command>] [blueprint] [flags]
+
+Commands:
+  (none) / menu        Interactive menu (TTY)
+  init                 Write AGENTS.md, CLAUDE.md, memory, .gitignore (no tool runtime)
+  install <blueprint>  Install blueprint into --target runtimes
+  update               Show update plan vs package VERSION
+  sync                 Re-apply installed blueprint with preserve-local
+  doctor               Validate package + target install health
+
+Blueprints:
+  default | engineering | startup
+
+Flags:
+  --overlay gitlab     Install GitLab/glab command overlay
+  --runtime NAME       cursor | claude | all
+                       (omit to get an interactive selector; both tools optional)
+  --target PATH        Consumer project root (any local path; not this package)
+  --dry-run            Print actions without writing
+  --force              Overwrite unmanaged files
+EOF
+}
+
+prompt_line() {
+  local label="$1"
+  local default="${2:-}"
+  local value=""
+  # Prompts MUST go to stderr — callers capture stdout as the answer.
+  if [[ -n "$default" ]]; then
+    printf '%s\n  default: %s\n> ' "$label" "$default" >&2
+  else
+    printf '%s\n> ' "$label" >&2
+  fi
+  read -r value || true
+  # Trim CR / surrounding whitespace (paste / terminal quirks)
+  value="${value//$'\r'/}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ -z "$value" ]]; then
+    printf '%s\n' "$default"
+  else
+    printf '%s\n' "$value"
+  fi
+}
+
+expand_path() {
+  local raw="$1"
+  # Expand leading ~ (bash does not expand inside variables)
+  if [[ "$raw" == "~" ]]; then
+    raw="$HOME"
+  elif [[ "$raw" == "~/"* ]]; then
+    raw="${HOME}/${raw:2}"
+  fi
+  # Absolute paths stay; relative paths resolve from the caller's cwd
+  if [[ "$raw" == /* ]]; then
+    printf '%s\n' "$raw"
+  else
+    printf '%s\n' "$(pwd)/$raw"
+  fi
+}
+
+paths_equal() {
+  local a b
+  a="$(cd "$1" 2>/dev/null && pwd || echo "$1")"
+  b="$(cd "$2" 2>/dev/null && pwd || echo "$2")"
+  [[ "$a" == "$b" ]]
+}
+
+select_blueprint() {
+  cat <<'EOF'
+
+Select blueprint:
+  1) default       Core harness (start/review, safety, skills)
+  2) engineering   + commit / refactor / ADR
+  3) startup       + PRD/ADR templates
+  4) cancel
+
+EOF
+  local choice=""
+  while true; do
+    printf 'Blueprint [1-4]: '
+    read -r choice || true
+    case "$choice" in
+      1|default|d) BLUEPRINT="default"; break ;;
+      2|engineering|e) BLUEPRINT="engineering"; break ;;
+      3|startup|s) BLUEPRINT="startup"; break ;;
+      4|q|cancel|"") return 1 ;;
+      *) warn "invalid choice: $choice (use 1-4)" ;;
+    esac
+  done
+  log "selected blueprint: $BLUEPRINT"
+  return 0
+}
+
+select_overlay() {
+  cat <<'EOF'
+
+Select forge overlay (optional):
+  1) none      No forge overlay
+  2) gitlab    GitLab / glab MR playbooks
+  3) cancel
+
+EOF
+  local choice=""
+  while true; do
+    printf 'Overlay [1-3]: '
+    read -r choice || true
+    case "$choice" in
+      1|none|n|"") OVERLAY=""; break ;;
+      2|gitlab|g) OVERLAY="gitlab"; break ;;
+      3|q|cancel) return 1 ;;
+      *) warn "invalid choice: $choice (use 1-3)" ;;
+    esac
+  done
+  if [[ -n "$OVERLAY" ]]; then
+    log "selected overlay: $OVERLAY"
+  else
+    log "selected overlay: none"
+  fi
+  return 0
+}
+
+menu_prompt_target() {
+  local _required="${1:-0}" # kept for call-site compat; always interactive
+  local raw="" resolved=""
+  local default_hint="$TARGET"
+
+  # Don't nudge people toward installing into the blueprint package itself.
+  if [[ -z "$default_hint" || "$default_hint" == "." ]] || paths_equal "$default_hint" "$ROOT"; then
+    default_hint=""
+  fi
+
+  while true; do
+    cat <<EOF
+
+────────────────────────────────────────
+  Consumer project target
+────────────────────────────────────────
+  Destination can be ANY local folder on this machine.
+  It does NOT need to live inside this blueprint repo.
+
+  Examples:
+    /Users/you/Developer/my-app
+    ~/Developer/experiment-slm-qlora
+    /tmp/demo-consumer
+
+  Blueprint package (do not use as target):
+    ${ROOT}
+
+EOF
+    if [[ -n "$default_hint" ]]; then
+      raw="$(prompt_line "Enter consumer project path (absolute or ~/…)" "$default_hint")"
+    else
+      raw="$(prompt_line "Enter consumer project path (absolute or ~/…)" "")"
+    fi
+
+    if [[ -z "$raw" ]]; then
+      warn "target path is required — use a path outside this blueprint repo"
+      continue
+    fi
+
+    # Guard against accidental multiline / polluted capture
+    raw="${raw%%$'\n'*}"
+    raw="${raw#"${raw%%[![:space:]]*}"}"
+    raw="${raw%"${raw##*[![:space:]]}"}"
+
+    resolved="$(expand_path "$raw")"
+    log "checking path: $resolved"
+    if [[ -d "$resolved" ]]; then
+      resolved="$(cd "$resolved" && pwd)"
+    elif [[ -d "$(dirname "$resolved")" ]]; then
+      resolved="$(cd "$(dirname "$resolved")" && pwd)/$(basename "$resolved")"
+    fi
+
+    if paths_equal "$resolved" "$ROOT"; then
+      warn "that path IS this blueprint package — pick a different consumer project"
+      continue
+    fi
+
+    printf '\n  Resolved target:\n    %s\n\n' "$resolved" >&2
+    if [[ -d "$resolved" ]]; then
+      printf 'Use this existing project? [Y/n]: ' >&2
+      local ok=""
+      read -r ok || true
+      case "$ok" in
+        ""|y|Y|yes|YES) ;;
+        *) continue ;;
+      esac
+    else
+      printf 'Path does not exist yet. Create it? [y/N]: ' >&2
+      local create=""
+      read -r create || true
+      case "$create" in
+        y|Y|yes|YES)
+          mkdir -p "$resolved" || {
+            warn "could not create: $resolved"
+            continue
+          }
+          log "created: $resolved"
+          ;;
+        *)
+          warn "enter an existing path, or confirm create"
+          continue
+          ;;
+      esac
+    fi
+
+    TARGET="$resolved"
+    log "target locked: $TARGET"
+    return 0
+  done
+}
+
+# Run a command function without killing the menu on failure.
+menu_run() {
+  set +e
+  (
+    set -e
+    "$@"
+  )
+  local rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    printf '\n  %s❌  Action failed%s (exit %s)\n' "$(ui_color red)$(ui_color bold)" "$(ui_color reset)" "$rc" >&2
+  else
+    printf '\n  %s✅  Action complete%s\n' "$(ui_color green)$(ui_color bold)" "$(ui_color reset)"
+  fi
+  printf '\n  %sPress Enter to return to menu…%s ' "$(ui_color dim)" "$(ui_color reset)"
+  read -r _ || true
+}
+
+cmd_menu() {
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    usage
+    die "interactive menu requires a TTY; pass a command (init|install|…)"
+  fi
+
+  # Always set target before the main menu (even if --target was passed, confirm it).
+  menu_prompt_target 1
+
+  while true; do
+    printf '\n'
+    ui_rule
+    printf '  %s✦ Shared Agent Blueprints%s\n' "$(ui_color bold)$(ui_color cyan)" "$(ui_color reset)"
+    ui_rule
+    ui_kv "package" "$(package_version)"
+    ui_kv "target" "$TARGET"
+    printf '\n'
+    printf '  %s1)%s  init         Shared contract + memory + .gitignore\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s2)%s  install      Blueprint + runtime (cursor / claude / all)\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s3)%s  sync         Re-apply installed blueprint\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s4)%s  update       Show update plan vs package VERSION\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s5)%s  doctor       Validate package / target health\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s6)%s  set target   Change consumer project path\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s7)%s  help         Show CLI usage\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '  %s8)%s  quit\n' "$(ui_color cyan)" "$(ui_color reset)"
+    printf '\n'
+    printf '  %s›%s ' "$(ui_color magenta)" "$(ui_color reset)"
+    local choice=""
+    read -r choice || true
+    case "$choice" in
+      1|init)
+        menu_run cmd_init
+        ;;
+      2|install)
+        select_blueprint || continue
+        select_overlay || continue
+        RUNTIME_SET=0
+        RUNTIME=""
+        select_runtime || continue
+        RUNTIME_SET=1
+        menu_run cmd_install
+        ;;
+      3|sync)
+        menu_run cmd_sync
+        ;;
+      4|update)
+        menu_run cmd_update
+        ;;
+      5|doctor)
+        menu_run cmd_doctor
+        ;;
+      6|target|set)
+        menu_prompt_target 1
+        ;;
+      7|help|h)
+        usage
+        printf '\n  %sPress Enter to return to menu…%s ' "$(ui_color dim)" "$(ui_color reset)"
+        read -r _ || true
+        ;;
+      8|q|quit|exit|"")
+        printf '  %s👋  bye%s\n' "$(ui_color dim)" "$(ui_color reset)"
+        return 0
+        ;;
+      *)
+        warn "invalid choice: $choice (use 1-8)"
+        ;;
+    esac
+  done
+}
+
+case "$cmd" in
+  menu|interactive) cmd_menu ;;
+  init) cmd_init ;;
+  install) cmd_install ;;
+  update) cmd_update ;;
+  sync) cmd_sync ;;
+  doctor) cmd_doctor ;;
+  -h|--help|help) usage ;;
+  "")
+    if [[ -t 0 && -t 1 ]]; then
+      cmd_menu
+    else
+      usage
+      exit 2
+    fi
+    ;;
+  *) die "unknown command: $cmd (see --help)" ;;
+esac

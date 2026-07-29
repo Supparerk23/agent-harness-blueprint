@@ -10,15 +10,15 @@ Before starting product work, install the harness:
 
 ```bash
 # 1) Shared contract + memory skeletons (no tool runtime yet)
-/path/to/shared-agent-blueprints/scripts/agent init --target .
+/path/to/agent-harness-blueprint/blueprint init --target .
 
 # 2) Project commands/rules/skills into tool runtimes
-/path/to/shared-agent-blueprints/scripts/agent install default --runtime all --target .
+/path/to/agent-harness-blueprint/blueprint install default --runtime all --target .
 # engineering + GitLab MR playbooks:
-# /path/to/shared-agent-blueprints/scripts/agent install engineering --overlay gitlab --runtime all --target .
+# /path/to/agent-harness-blueprint/blueprint install engineering --overlay gitlab --runtime all --target .
 ```
 
-`--runtime` may be `cursor`, `claude`, or `all`. Omit it to pick interactively (Cursor and Claude are both optional). Re-sync later with `scripts/agent sync --target .`.
+`--runtime` may be `cursor`, `claude`, or `all`. Omit it to pick interactively (Cursor and Claude are both optional). Re-sync later with `./blueprint sync --target .`.
 
 ## Harness overview
 
@@ -44,7 +44,7 @@ Workflow templates (`adr`, `prd`, `review-checklist`) stay under the runtime —
 
 Agents that only read root markdown still get this contract from `AGENTS.md`. Claude Code also loads `CLAUDE.md` (thin pointer here).
 
-Prefer updating the blueprint package, then `scripts/agent sync --target .` — do not fork shared playbooks in-place unless you intend a local override.
+Prefer updating the blueprint package, then `./blueprint sync --target .` — do not fork shared playbooks in-place unless you intend a local override.
 
 ## AI workflow
 

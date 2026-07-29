@@ -38,8 +38,8 @@ Narrative docs for this shared agent blueprint package. Start from the root [REA
 ## CLI
 
 ```bash
-scripts/agent doctor
-scripts/agent init --target /path/to/repo
-scripts/agent install default --runtime all --target /path/to/repo
-scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/repo
+./blueprint doctor
+./blueprint init --target /path/to/repo
+./blueprint install default --runtime all --target /path/to/repo
+./blueprint install engineering --overlay gitlab --runtime all --target /path/to/repo
 ```

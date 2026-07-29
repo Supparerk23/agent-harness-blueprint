@@ -8,14 +8,14 @@ From the consumer repo:
 
 ```bash
 # point at a checkout / submodule / vendored copy of this package
-/path/to/shared-agent-blueprints/scripts/agent init --target .
+/path/to/agent-harness-blueprint/blueprint init --target .
 
-/path/to/shared-agent-blueprints/scripts/agent install engineering \
+/path/to/agent-harness-blueprint/blueprint install engineering \
   --overlay gitlab \
   --runtime all \
   --target .
 
-/path/to/shared-agent-blueprints/scripts/agent doctor --target .
+/path/to/agent-harness-blueprint/blueprint doctor --target .
 ```
 
 ## `.agent-blueprint.yaml` (generated shape)
@@ -32,7 +32,7 @@ installed_at_utc: 2026-07-29T00:00:00Z
 conflict_policy: preserve-local
 ```
 
-`source` is a **portable repository identity** (from the blueprint package `git remote origin`), not a machine-local filesystem path. Sync still runs from whichever checkout executes `scripts/agent`.
+`source` is a **portable repository identity** (from the blueprint package `git remote origin`), not a machine-local filesystem path. Sync still runs from whichever checkout executes `./blueprint`.
 
 ## `.agent-blueprint.local.yaml` (project overrides)
 

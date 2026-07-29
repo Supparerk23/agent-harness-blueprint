@@ -1,6 +1,6 @@
 # Compatibility layer
 
-This repository is the **shared blueprint package**. Consuming projects receive a shared `AGENTS.md` contract, memory files, and optional tool runtimes via `scripts/agent`.
+This repository is the **shared blueprint package**. Consuming projects receive a shared `AGENTS.md` contract, memory files, and optional tool runtimes via `./blueprint`.
 
 ## Package paths (source of truth)
 
@@ -13,7 +13,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 | `blueprints/` | Composable profiles (`default`, `engineering`, `startup`) |
 | `docs/` | Package documentation |
 | `manifest.yaml` / `VERSION` | Package metadata |
-| `scripts/agent` | Init / install / sync / doctor CLI |
+| `./blueprint` | Init / install / sync / doctor CLI |
 | `AGENTS.md` / `CLAUDE.md` | Package-source orientation only |
 
 ## Consumer-only paths (do not commit in this package)
@@ -29,8 +29,8 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 
 ## How adopting projects work
 
-1. Run `scripts/agent init --target /path/to/repo` — writes `AGENTS.md`, `CLAUDE.md`, memory skeletons, and a managed `.gitignore` section from `templates/gitignore` (no tool runtime yet).
-2. Run `scripts/agent install <blueprint> --runtime all --target /path/to/repo` — projects `harness/` into `.cursor/` and/or `.claude/`.
+1. Run `./blueprint init --target /path/to/repo` — writes `AGENTS.md`, `CLAUDE.md`, memory skeletons, and a managed `.gitignore` section from `templates/gitignore` (no tool runtime yet).
+2. Run `./blueprint install <blueprint> --runtime all --target /path/to/repo` — projects `harness/` into `.cursor/` and/or `.claude/`.
 3. Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) always win over managed files.
 4. Memory state files are never overwritten by install/sync when they already exist in the target.
 

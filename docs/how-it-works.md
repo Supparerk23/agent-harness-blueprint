@@ -61,7 +61,7 @@ Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) alw
 ## Update loop
 
 1. Edit package sources under `harness/` / `templates/` / `blueprints/`.
-2. In the consumer: `scripts/agent sync --dry-run`, review, then `sync`.
-3. Run `scripts/agent doctor --target .`.
+2. In the consumer: `./blueprint sync --dry-run`, review, then `sync`.
+3. Run `./blueprint doctor --target .`.
 
 Details: [compatibility.md](compatibility.md), [slash-commands.md](slash-commands.md), [rules.md](rules.md), [skills.md](skills.md).

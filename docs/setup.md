@@ -6,10 +6,10 @@ Required steps before product work in any adopting repository.
 
 ```mermaid
 flowchart TD
-  A[Checkout shared-agent-blueprints] --> B["agent doctor"]
-  B --> C["agent init --target repo"]
-  C --> D["agent install PROFILE --runtime all"]
-  D --> E["agent doctor --target repo"]
+  A[Checkout agent-harness-blueprint] --> B["./blueprint doctor"]
+  B --> C["./blueprint init --target repo"]
+  C --> D["./blueprint install PROFILE --runtime all"]
+  D --> E["./blueprint doctor --target repo"]
   E --> F[Start coding with /start]
 ```
 
@@ -18,9 +18,9 @@ flowchart TD
 On a TTY, run with no command (or `menu`) for a guided UI:
 
 ```bash
-scripts/agent
+./blueprint
 # or
-scripts/agent menu --target /path/to/your-repo
+./blueprint menu --target /path/to/your-repo
 ```
 
 Menu flow: set **target** first (any local path outside this package), then choose `init` / `install` (blueprint → overlay → runtime) / `sync` / `update` / `doctor`.
@@ -29,19 +29,19 @@ Menu flow: set **target** first (any local path outside this package), then choo
 
 ```bash
 # From a clone of this package:
-scripts/agent doctor
+./blueprint doctor
 
 # 1) Shared contract + memory only (no .cursor / .claude yet)
-scripts/agent init --target /path/to/your-repo
+./blueprint init --target /path/to/your-repo
 
 # 2) Project harness into tool runtimes
-scripts/agent install default --runtime all --target /path/to/your-repo
+./blueprint install default --runtime all --target /path/to/your-repo
 
 # Optional engineering + GitLab MR playbooks
-scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/your-repo
+./blueprint install engineering --overlay gitlab --runtime all --target /path/to/your-repo
 
 # Later: refresh managed files without clobbering local memory
-scripts/agent sync --target /path/to/your-repo
+./blueprint sync --target /path/to/your-repo
 ```
 
 ## What each step writes

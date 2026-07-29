@@ -10,7 +10,7 @@ flowchart LR
     harness[harness/]
     templates[templates/]
     blueprints[blueprints/]
-    cli[scripts/agent]
+    cli[blueprint]
   end
 
   subgraph consumer [Adopting project]

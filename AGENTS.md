@@ -9,11 +9,11 @@ This repository is the **blueprint package**, not a product app. Edit shared sou
 Consumers use the CLI (never copy package-root docs as the product contract):
 
 ```bash
-scripts/agent init --target /path/to/repo
-scripts/agent install default --runtime all --target /path/to/repo
-scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/repo
-scripts/agent sync --target /path/to/repo
-scripts/agent doctor --target /path/to/repo
+./blueprint init --target /path/to/repo
+./blueprint install default --runtime all --target /path/to/repo
+./blueprint install engineering --overlay gitlab --runtime all --target /path/to/repo
+./blueprint sync --target /path/to/repo
+./blueprint doctor --target /path/to/repo
 ```
 
 `init` writes the consumer `AGENTS.md` / `CLAUDE.md` from `templates/entrypoints/` plus memory skeletons. `install` projects `harness/` into `.cursor/` and/or `.claude/` per `--runtime`.

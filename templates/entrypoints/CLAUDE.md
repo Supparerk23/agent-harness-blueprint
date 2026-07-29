@@ -12,6 +12,6 @@ Claude Code entrypoint for this repository.
 
 ## Notes
 
-- Commands live under `.claude/commands/` after `scripts/agent install … --runtime claude|all`.
+- Commands live under `.claude/commands/` after `./blueprint install … --runtime claude|all`.
 - Do not fork shared playbooks here; sync from the blueprint package or use local overrides.
 - Honor safety and memory rules in `AGENTS.md`.

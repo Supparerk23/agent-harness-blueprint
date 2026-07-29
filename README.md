@@ -25,7 +25,7 @@ flowchart LR
   subgraph package [This package]
     harness[harness/]
     entry[templates/entrypoints/]
-    cli[scripts/agent]
+    cli[./blueprint]
   end
 
   subgraph consumer [Your project]
@@ -44,7 +44,7 @@ flowchart LR
 
 | Concept | Detail |
 |---|---|
-| Package | `harness/`, `blueprints/`, `templates/`, `scripts/agent` |
+| Package | `harness/`, `blueprints/`, `templates/`, `./blueprint` |
 | Consumer contract | `AGENTS.md` (+ thin `CLAUDE.md`) |
 | Runtimes | `.cursor/` and/or `.claude/` from `--runtime` |
 
@@ -65,14 +65,14 @@ flowchart TD
 
 ```bash
 # Interactive menu (TTY)
-scripts/agent
-scripts/agent menu --target /path/to/your-repo
+./blueprint
+./blueprint menu --target /path/to/your-repo
 
-scripts/agent doctor
-scripts/agent init --target /path/to/your-repo
-scripts/agent install default --runtime all --target /path/to/your-repo
+./blueprint doctor
+./blueprint init --target /path/to/your-repo
+./blueprint install default --runtime all --target /path/to/your-repo
 # optional:
-# scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/your-repo
+# ./blueprint install engineering --overlay gitlab --runtime all --target /path/to/your-repo
 ```
 
 | Step | Result |
@@ -163,6 +163,6 @@ Full walkthrough: **[docs/harness-workflow.md](docs/harness-workflow.md)** · `/
 ├── templates/           # entrypoints + memory + PRD/ADR
 ├── prompts/             # prompt library
 ├── docs/                # diagrams + deep docs
-├── scripts/agent        # init | install | sync | doctor
+├── blueprint            # CLI: init | install | sync | doctor | menu
 └── examples/consumer/   # example consumer install state
 ```

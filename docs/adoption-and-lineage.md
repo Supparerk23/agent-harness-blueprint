@@ -3,11 +3,11 @@
 ## Install into a new repository
 
 ```bash
-/path/to/shared-agent-blueprints/scripts/agent init --target /path/to/your-repo
-/path/to/shared-agent-blueprints/scripts/agent install default --runtime all --target /path/to/your-repo
+/path/to/agent-harness-blueprint/blueprint init --target /path/to/your-repo
+/path/to/agent-harness-blueprint/blueprint install default --runtime all --target /path/to/your-repo
 # Engineering + GitLab overlay:
-/path/to/shared-agent-blueprints/scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/your-repo
-/path/to/shared-agent-blueprints/scripts/agent doctor --target /path/to/your-repo
+/path/to/agent-harness-blueprint/blueprint install engineering --overlay gitlab --runtime all --target /path/to/your-repo
+/path/to/agent-harness-blueprint/blueprint doctor --target /path/to/your-repo
 ```
 
 That writes consumer-only artifacts into the target:

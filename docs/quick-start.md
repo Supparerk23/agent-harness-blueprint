@@ -2,7 +2,7 @@
 
 `/start` (see [harness/commands/start.md](../harness/commands/start.md)) aligns planning, telemetry, and scratchpads in the **consuming project** before heavy implementation.
 
-Package sources live under `harness/` and `templates/`. After `scripts/agent install --runtime …`, the same assets appear under the consumer's `.cursor/` and/or `.claude/`.
+Package sources live under `harness/` and `templates/`. After `./blueprint install --runtime …`, the same assets appear under the consumer's `.cursor/` and/or `.claude/`.
 
 ## Steps (in the adopting project)
 
