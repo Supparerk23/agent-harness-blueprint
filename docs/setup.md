@@ -13,6 +13,18 @@ flowchart TD
   E --> F[Start coding with /start]
 ```
 
+## Interactive menu
+
+On a TTY, run with no command (or `menu`) for a guided UI:
+
+```bash
+scripts/agent
+# or
+scripts/agent menu --target /path/to/your-repo
+```
+
+Menu flow: set **target** first (any local path outside this package), then choose `init` / `install` (blueprint → overlay → runtime) / `sync` / `update` / `doctor`.
+
 ## Commands
 
 ```bash

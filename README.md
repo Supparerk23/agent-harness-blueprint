@@ -64,6 +64,10 @@ flowchart TD
 ```
 
 ```bash
+# Interactive menu (TTY)
+scripts/agent
+scripts/agent menu --target /path/to/your-repo
+
 scripts/agent doctor
 scripts/agent init --target /path/to/your-repo
 scripts/agent install default --runtime all --target /path/to/your-repo
