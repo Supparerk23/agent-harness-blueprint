@@ -21,7 +21,7 @@ From the consumer repo:
 ## `.agent-blueprint.yaml` (generated shape)
 
 ```yaml
-source: /path/to/shared-agent-blueprints
+source: https://github.com/xxx/agent-harness-blueprint
 version: 1.0.0
 blueprint: engineering
 overlay: gitlab
@@ -31,6 +31,8 @@ runtimes:
 installed_at_utc: 2026-07-29T00:00:00Z
 conflict_policy: preserve-local
 ```
+
+`source` is a **portable repository identity** (from the blueprint package `git remote origin`), not a machine-local filesystem path. Sync still runs from whichever checkout executes `scripts/agent`.
 
 ## `.agent-blueprint.local.yaml` (project overrides)
 
