@@ -1,6 +1,7 @@
 .DS_Store
 *.blueprint-conflict
 .tmp-consumer-test/
+.tmp-consumer-test-*/
 
 # Adoption/runtime artifacts belong in consuming projects, not this package
 .cursor/
@@ -13,5 +14,6 @@ LEARNING.md
 ANTI-PATTERNS.md
 .agent-blueprint.yaml
 .agent-blueprint.local.yaml
+.agent-blueprint/
 AGENTS.local.md
 CLAUDE.local.md

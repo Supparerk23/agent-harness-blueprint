@@ -13,8 +13,9 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 | `blueprints/` | Composable profiles (`default`, `engineering`, `startup`) |
 | `docs/` | Package documentation |
 | `manifest.yaml` / `VERSION` | Package metadata |
-| `./blueprint` | Init / install / sync / doctor CLI |
+| `./blueprint` | Init / install / sync / doctor CLI (`lib/blueprint/` UX modules) |
 | `AGENTS.md` / `CLAUDE.md` | Package-source orientation only |
+| `tests/cli/` | CLI smoke tests |
 
 ## Consumer-only paths (do not commit in this package)
 
@@ -26,6 +27,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 | `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md` | Short-lived / curated consumer memory |
 | `ARCHITECTURE.md` | Optional stable design doc in the consumer |
 | `.agent-blueprint.yaml` | Install state for that consumer |
+| `.agent-blueprint/` | Session resume state (gitignored; not secrets) |
 
 ## How adopting projects work
 
@@ -33,6 +35,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 2. Run `./blueprint install <blueprint> --runtime all --target /path/to/repo` — projects `harness/` into `.cursor/` and/or `.claude/`.
 3. Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) always win over managed files.
 4. Memory state files are never overwritten by install/sync when they already exist in the target.
+5. Optional: symlink `blueprint` onto PATH. When `source` in `.agent-blueprint.yaml` is a git URL, install/sync use a cache under `$XDG_CACHE_HOME/blueprint/repos/`.
 
 ## Runtime projection
 

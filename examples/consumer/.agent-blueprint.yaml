@@ -1,7 +1,7 @@
 # Example generated install state for a consuming project.
-# In a real repo this file is written by `scripts/agent install`.
-# source is a portable repository identity (not a machine-local path).
-source: agent-harness-blueprint
+# In a real repo this file is written by `blueprint install`.
+# When source is a git URL, install/sync fetch a local cache then copy.
+source: https://github.com/example/agent-harness-blueprint
 version: 1.0.0
 blueprint: engineering
 overlay: gitlab

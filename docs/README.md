@@ -38,8 +38,12 @@ Narrative docs for this shared agent blueprint package. Start from the root [REA
 ## CLI
 
 ```bash
+# Optional: ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
 ./blueprint doctor
 ./blueprint init --target /path/to/repo
 ./blueprint install default --runtime all --target /path/to/repo
 ./blueprint install engineering --overlay gitlab --runtime all --target /path/to/repo
+./blueprint sync --target /path/to/repo
 ```
+
+Smoke tests: `./tests/cli/smoke.sh`

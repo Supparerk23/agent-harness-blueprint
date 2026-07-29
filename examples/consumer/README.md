@@ -7,7 +7,10 @@ Example **install state** for a project consuming `shared-agent-blueprints`.
 From the consumer repo:
 
 ```bash
-# point at a checkout / submodule / vendored copy of this package
+# Optional PATH install
+ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
+
+# Point at a checkout / submodule / vendored copy of this package
 /path/to/agent-harness-blueprint/blueprint init --target .
 
 /path/to/agent-harness-blueprint/blueprint install engineering \
@@ -16,6 +19,9 @@ From the consumer repo:
   --target .
 
 /path/to/agent-harness-blueprint/blueprint doctor --target .
+
+# Later refreshes
+/path/to/agent-harness-blueprint/blueprint sync --target .
 ```
 
 ## `.agent-blueprint.yaml` (generated shape)
@@ -32,7 +38,7 @@ installed_at_utc: 2026-07-29T00:00:00Z
 conflict_policy: preserve-local
 ```
 
-`source` is a **portable repository identity** (from the blueprint package `git remote origin`), not a machine-local filesystem path. Sync still runs from whichever checkout executes `./blueprint`.
+`source` is a **portable repository identity**. When it is a git URL (`https://…`, `git@…`, `file://…`), `install` / `sync` clone or update a cache under `$XDG_CACHE_HOME/blueprint/repos/` and copy from that cache. Bare names still use whichever package checkout executes `./blueprint`.
 
 ## `.agent-blueprint.local.yaml` (project overrides)
 
@@ -57,3 +63,5 @@ Workflow docs such as `review-checklist.md` / `adr.md` land under `.cursor/templ
 **Local state (created in the consumer, never part of the blueprint package):** `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`, `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md`, `ARCHITECTURE.md`.
 
 **Local overrides (always win):** `*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`.
+
+**Session / history:** `.agent-blueprint/` holds resume state (gitignored). Run history lives in `$XDG_DATA_HOME/blueprint/history.jsonl` on the machine running the CLI.

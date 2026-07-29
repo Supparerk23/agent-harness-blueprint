@@ -10,6 +10,7 @@ LEARNING.md
 ANTI-PATTERNS.md
 *.blueprint-conflict
 .agent-blueprint.local.yaml
+.agent-blueprint/
 AGENTS.local.md
 CLAUDE.local.md
 # --- end shared-agent-blueprints ---

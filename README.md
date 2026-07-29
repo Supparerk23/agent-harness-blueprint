@@ -58,12 +58,15 @@ Every project should install this kit before coding.
 
 ```mermaid
 flowchart TD
-  init["1. agent init"] --> install["2. agent install --runtime all"]
-  install --> doctor["3. agent doctor"]
+  init["1. blueprint init"] --> install["2. blueprint install --runtime all"]
+  install --> doctor["3. blueprint doctor"]
   doctor --> work[Start with /start]
 ```
 
 ```bash
+# Optional: put the CLI on PATH
+ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
+
 # Interactive menu (TTY)
 ./blueprint
 ./blueprint menu --target /path/to/your-repo
@@ -73,13 +76,19 @@ flowchart TD
 ./blueprint install default --runtime all --target /path/to/your-repo
 # optional:
 # ./blueprint install engineering --overlay gitlab --runtime all --target /path/to/your-repo
+
+# Later: refresh managed files
+./blueprint sync --target /path/to/your-repo
 ```
 
 | Step | Result |
 |---|---|
 | `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
 | `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` (prompts for runtime if `--runtime` omitted) |
+| `sync` | Re-applies the installed blueprint (`preserve-local`); fetches a remote `source` URL into a local cache when needed |
 | `--runtime` | `cursor` \| `claude` \| `all` — both tools optional; omit for interactive selector |
+
+The CLI clears the terminal once per operation (TTY), shows a compact header (project / branch / source / run ID), streams file events with status symbols, and writes a short summary. Interrupted runs can be resumed on the next `install` / `sync`. History is stored locally under `$XDG_DATA_HOME/blueprint/history.jsonl` (no secrets).
 
 | Blueprint | Use when |
 |---|---|
@@ -88,6 +97,7 @@ flowchart TD
 | `startup` | PRD/ADR-heavy early product work |
 
 Step-by-step + checklist: **[docs/setup.md](docs/setup.md)** · **[docs/adoption-and-lineage.md](docs/adoption-and-lineage.md)**
+
 
 ---
 
@@ -161,8 +171,10 @@ Full walkthrough: **[docs/harness-workflow.md](docs/harness-workflow.md)** · `/
 ├── harness/             # canonical commands, rules, skills
 ├── blueprints/          # default | engineering | startup
 ├── templates/           # entrypoints + memory + PRD/ADR
+├── lib/blueprint/       # CLI terminal UX modules
 ├── prompts/             # prompt library
 ├── docs/                # diagrams + deep docs
+├── tests/cli/           # CLI smoke tests
 ├── blueprint            # CLI: init | install | sync | doctor | menu
 └── examples/consumer/   # example consumer install state
 ```

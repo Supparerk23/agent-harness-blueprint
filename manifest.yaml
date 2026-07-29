@@ -102,6 +102,8 @@ install:
   conflict_policy: preserve-local
   default_runtime: prompt
   copy_memory_templates_to_root: true
+  source_cache: "${XDG_CACHE_HOME:-$HOME/.cache}/blueprint/repos"
+  history: "${XDG_DATA_HOME:-$HOME/.local/share}/blueprint/history.jsonl"
   do_not_overwrite:
     - PLANNING.md
     - DECISIONS.md
