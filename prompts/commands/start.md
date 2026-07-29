@@ -2,15 +2,16 @@ Start a new task: create a branch and reset task-scoped memory files.
 
 1. Ask for branch details before creating:
    - Type: `feature/` or `hotfix/`
-   - Name: JIRA key or short slug (e.g. `NEUR-1234`)
+   - Name: JIRA key or short slug (e.g. `ABC-1234`)
    - Confirm full branch name: `[type][name]`
 
 2. Create and switch to the branch:
-   `git checkout -b feature/NEUR-1234`
+   `git checkout -b feature/ABC-1234`
 
-3. Reset task memory files using skill reset templates (read both files; copy templates exactly):
-   - `.cursor/skills/planning-execution-tracking/templates.md` → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
-   - `.cursor/skills/memory-system-protocol/templates.md` → `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md`
+3. Reset task memory files using skill reset templates (read both files; copy templates exactly).
+   Resolve skill paths under the active runtime (`.cursor/skills/` or `.claude/skills/`):
+   - `…/planning-execution-tracking/templates.md` → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
+   - `…/memory-system-protocol/templates.md` → `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md`
 
    Do not reset files listed under **Do not reset** in `memory-system-protocol/templates.md`.
 

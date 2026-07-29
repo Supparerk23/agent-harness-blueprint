@@ -1,58 +1,34 @@
 # AGENTS.md
 
-Shared agent instructions for repositories using **shared-agent-blueprints**.
+Package-source instructions for **shared-agent-blueprints**.
 
-## Package vs consumer
+This repository is the **blueprint package**, not a product app. Edit shared sources under `harness/`, `prompts/`, `templates/`, and `blueprints/`. Do not keep consumer task-memory files or live `.cursor/` / `.claude/` trees here.
 
-- **This package** stores shared sources under `harness/`, `prompts/`, `templates/`, and `blueprints/`.
-- **Consuming projects** receive a generated `.cursor/` runtime plus memory files via `scripts/agent install`.
+## For adopting projects
 
-Do not keep task-memory files (`PLANNING.md`, `RUN_LOG.md`, etc.) or a live `.cursor/` tree inside the blueprint package itself.
-
-## Runtime layout (in consumers)
-
-Cursor reads local paths. Install writes:
-
-- `.cursor/commands/` — slash playbooks
-- `.cursor/skills/` — curated procedures
-- `.cursor/rules/` — always-on / glob policies
-
-Prefer updating package sources under `harness/`, then run `scripts/agent sync --target <consumer>`.
-
-## Memory harness (consumer-only)
-
-When present at the **consumer** repo root:
-
-| File | Role |
-|---|---|
-| `PLANNING.md` | Goals and task checklists |
-| `DECISIONS.md` | Why logs |
-| `RUN_LOG.md` | Execution telemetry only |
-| `HOTCACHE.md` | Short-lived operational state |
-| `LEARNING.md` | Candidate insights |
-| `ANTI-PATTERNS.md` | High-confidence safety bans |
-| `ARCHITECTURE.md` | Stable design (never auto-reset) |
-
-Pristine templates: `templates/memory/`.
-
-## Overrides (consumer-only)
-
-- `AGENTS.local.md`
-- `CLAUDE.local.md`
-- `.agent-blueprint.local.yaml`
-- `.cursor/rules/*.local.mdc`
-
-Shared installs must not overwrite local state files (`PLANNING.md`, `RUN_LOG.md`, etc.).
-
-## CLI
+Consumers use the CLI (never copy package-root docs as the product contract):
 
 ```bash
 scripts/agent init --target /path/to/repo
-scripts/agent install default --target /path/to/repo
-scripts/agent install engineering-fastapi --overlay gitlab --target /path/to/repo
-scripts/agent update --target /path/to/repo
+scripts/agent install default --runtime all --target /path/to/repo
+scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/repo
 scripts/agent sync --target /path/to/repo
-scripts/agent doctor
+scripts/agent doctor --target /path/to/repo
 ```
 
-<!-- managed-by: shared-agent-blueprints -->
+`init` writes the consumer `AGENTS.md` / `CLAUDE.md` from `templates/entrypoints/` plus memory skeletons. `install` projects `harness/` into `.cursor/` and/or `.claude/` per `--runtime`.
+
+See [README.md](README.md) and [docs/](docs/).
+
+## Package edit order
+
+1. This file / [CLAUDE.md](CLAUDE.md) for package orientation
+2. `harness/` skills, rules, commands relevant to the change
+3. `templates/entrypoints/` when changing the consumer contract
+4. `docs/` for adoption and compatibility notes
+
+## Don't
+
+- Commit consumer artifacts (`.cursor/`, `.claude/`, `PLANNING.md`, etc.) into this package
+- Point product repos at this package-root `AGENTS.md` as their runtime contract
+- Treat optional overlays (e.g. GitLab) as universal defaults

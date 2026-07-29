@@ -2,7 +2,7 @@
 schema_version: 1
 version: 1.0.0
 name: shared-agent-blueprints
-description: Reusable Cursor agent harness, prompts, templates, and blueprint profiles.
+description: Reusable multi-agent harness, prompts, templates, and blueprint profiles for Cursor, Claude Code, and AGENTS.md-compatible tools.
 
 blueprints:
   - name: default
@@ -14,11 +14,6 @@ blueprints:
     path: blueprints/engineering
     extends: default
     description: Engineering workflows — commit/review prompts and optional forge profiles.
-
-  - name: engineering-fastapi
-    path: blueprints/engineering/fastapi
-    extends: engineering
-    description: FastAPI + Alembic stack rules from the AI Wealth Health Check lineage.
 
   - name: startup
     path: blueprints/startup
@@ -55,6 +50,8 @@ prompts:
     - agent-system.md
 
 templates:
+  - entrypoints/AGENTS.md
+  - entrypoints/CLAUDE.md
   - memory/planning.md
   - memory/decisions.md
   - memory/run-log.md
@@ -73,12 +70,19 @@ compatibility:
     - .cursor/commands
     - .cursor/skills
     - .cursor/rules
+    - .claude/commands
+    - .claude/skills
+    - .claude/rules
   docs_root: docs/
-  runtime_root: .cursor
+  runtime_roots:
+    - .cursor
+    - .claude
   source_root: harness
+  entrypoints_root: templates/entrypoints
   managed_marker: "<!-- managed-by: shared-agent-blueprints -->"
   package_must_not_contain:
     - .cursor/
+    - .claude/
     - PLANNING.md
     - DECISIONS.md
     - RUN_LOG.md
@@ -90,10 +94,10 @@ compatibility:
     - .agent-blueprint.local.yaml
     - AGENTS.local.md
     - CLAUDE.local.md
-    - .cursor/rules/key-principles.local.mdc
 
 install:
   conflict_policy: preserve-local
+  default_runtime: all
   copy_memory_templates_to_root: true
   do_not_overwrite:
     - PLANNING.md

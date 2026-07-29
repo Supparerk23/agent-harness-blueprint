@@ -6,7 +6,7 @@ alwaysApply: true
 # Planning Execution Tracking
 
 This rule intentionally stays thin to avoid overlap with the project skill:
-`.cursor/skills/planning-execution-tracking/SKILL.md`.
+`<runtime>/skills/planning-execution-tracking/SKILL.md` (`.cursor` or `.claude`).
 
 When a user asks to execute work from `PLANNING.md` (or update planning progress),
 always apply that skill and follow its workflow.

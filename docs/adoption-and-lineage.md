@@ -1,30 +1,31 @@
-# Adoption checklist & naming lineage
+# Adoption checklist
 
 ## Install into a new repository
 
 ```bash
-/path/to/shared-agent-blueprints/scripts/agent install default --target /path/to/your-repo
-# FastAPI lineage + GitLab overlay:
-/path/to/shared-agent-blueprints/scripts/agent install engineering-fastapi --overlay gitlab --target /path/to/your-repo
+/path/to/shared-agent-blueprints/scripts/agent init --target /path/to/your-repo
+/path/to/shared-agent-blueprints/scripts/agent install default --runtime all --target /path/to/your-repo
+# Engineering + GitLab overlay:
+/path/to/shared-agent-blueprints/scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/your-repo
 /path/to/shared-agent-blueprints/scripts/agent doctor --target /path/to/your-repo
 ```
 
 That writes consumer-only artifacts into the target:
 
-- `.cursor/` (from `harness/` + selected blueprint/overlay)
+- `AGENTS.md` / `CLAUDE.md` from `templates/entrypoints/` (shared AI workflow contract)
 - memory files from `templates/memory/` if absent
+- `.cursor/` and/or `.claude/` from `harness/` + selected blueprint/overlay (`--runtime`)
 - install state `.agent-blueprint.yaml`
 
 ## Manual cherry-pick (optional)
 
-1. Copy from `harness/commands|skills|rules` (and optional blueprint overlays) into the target `.cursor/`.
+1. Copy from `harness/commands|skills|rules` (and optional blueprint overlays) into the target `.cursor/` and/or `.claude/`.
 2. Decide whether automation targets **GitLab (`glab`)** or needs **GitHub (`gh`)** rewrites.
-3. Skip FastAPI/Alembic/key-principles rules unless the target is that stack.
-4. Keep `/start` + the memory protocol when you want cross-session continuity and auditable artifacts.
-5. Split additional prose into `docs/` whenever the root `README` risks becoming a novel.
+3. Keep `/start` + the memory protocol when you want cross-session continuity and auditable artifacts.
+4. Split additional prose into `docs/` whenever the root `README` risks becoming a novel.
 
-## Relationship to *AI Wealth Health Check*
+## Team standard
 
-Frontmatter descriptions may still mention the originating service. Treat that text as **lineage metadata**—edit it in forks so future agents know which assumptions (FastAPI layout, Pub/Sub workers, Alembic, etc.) remain true for your project.
+Every project should run `init` before coding so `AGENTS.md` documents the harness and AI workflow. Tool-specific runtimes are projections of the same `harness/` sources — edit the package, then `sync`.
 
-Stack-specific rules live under `blueprints/engineering/fastapi/` and are only installed with `engineering-fastapi`. See [compatibility.md](compatibility.md).
+See [compatibility.md](compatibility.md).

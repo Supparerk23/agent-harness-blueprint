@@ -1,71 +1,164 @@
 # Shared Agent Blueprints
 
-Reusable **Cursor** agent harness packaged as composable blueprints. This repository is the **package source** — it does not ship a live project `.cursor/` tree or task-memory files.
+Team harness for **Cursor**, **Claude Code**, and any agent that honors `AGENTS.md`.
 
-Originated with Finnomena's *AI Wealth Health Check* FastAPI + worker service. Stack-specific rules live under `blueprints/engineering/fastapi/` — not in the default profile.
+This repo is the **package source**. Adopting projects run `init` → `install` before product work. Live `.cursor/` / `.claude/` trees and task memory files belong in consumers only.
 
-## Quick start
+---
+
+## Contents
+
+1. [Architecture](#1-architecture)
+2. [Setup blueprint](#2-setup-blueprint)
+3. [How it works](#3-how-it-works)
+4. [Harness workflow](#4-harness-workflow)
+5. [Docs index](#5-docs-index)
+
+---
+
+## 1. Architecture
+
+Canonical content lives under `harness/`. Tool runtimes are projections. `AGENTS.md` is the shared contract every agent reads.
+
+```mermaid
+flowchart LR
+  subgraph package [This package]
+    harness[harness/]
+    entry[templates/entrypoints/]
+    cli[scripts/agent]
+  end
+
+  subgraph consumer [Your project]
+    agents[AGENTS.md]
+    cursor[".cursor/"]
+    claude[".claude/"]
+    memory[Memory files]
+  end
+
+  cli -->|init| agents
+  cli -->|init| memory
+  entry -->|init| agents
+  harness -->|install| cursor
+  harness -->|install| claude
+```
+
+| Concept | Detail |
+|---|---|
+| Package | `harness/`, `blueprints/`, `templates/`, `scripts/agent` |
+| Consumer contract | `AGENTS.md` (+ thin `CLAUDE.md`) |
+| Runtimes | `.cursor/` and/or `.claude/` from `--runtime` |
+
+Full diagrams: **[docs/architecture.md](docs/architecture.md)** · compatibility: **[docs/compatibility.md](docs/compatibility.md)**
+
+---
+
+## 2. Setup blueprint
+
+Every project should install this kit before coding.
+
+```mermaid
+flowchart TD
+  init["1. agent init"] --> install["2. agent install --runtime all"]
+  install --> doctor["3. agent doctor"]
+  doctor --> work[Start with /start]
+```
 
 ```bash
 scripts/agent doctor
-scripts/agent install default --target /path/to/your-repo
-# or
-scripts/agent install engineering-fastapi --overlay gitlab --target /path/to/your-repo
-scripts/agent sync --dry-run --target /path/to/your-repo
+scripts/agent init --target /path/to/your-repo
+scripts/agent install default --runtime all --target /path/to/your-repo
+# optional:
+# scripts/agent install engineering --overlay gitlab --runtime all --target /path/to/your-repo
 ```
 
-Install writes `.cursor/`, optional `AGENTS.md` / `CLAUDE.md`, and memory files **into the target project** from `harness/` + `templates/`.
+| Step | Result |
+|---|---|
+| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons — **no** tool runtime yet |
+| `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` |
+| `--runtime` | `cursor` \| `claude` \| `all` (default) |
 
-## Package layout
+| Blueprint | Use when |
+|---|---|
+| `default` | Any repo — start/review, safety, core skills |
+| `engineering` | Commit/refactor/ADR workflows |
+| `startup` | PRD/ADR-heavy early product work |
+
+Step-by-step + checklist: **[docs/setup.md](docs/setup.md)** · **[docs/adoption-and-lineage.md](docs/adoption-and-lineage.md)**
+
+---
+
+## 3. How it works
+
+Agents orient from `AGENTS.md`, then rules/skills under the active runtime, then memory when executing planned work.
+
+```mermaid
+flowchart TD
+  A[AGENTS.md] --> O[Local overrides]
+  O --> R[Runtime rules]
+  R --> S[Skills / commands]
+  S --> M[Memory files]
+```
+
+| Layer | Role |
+|---|---|
+| Commands | Playbooks: `/start`, `/review`, `/commit`, forge overlays |
+| Rules | Always-on or path-scoped policy |
+| Skills | Multi-step procedures (`SKILL.md` + templates) |
+| Memory | Cross-session planning, decisions, telemetry |
+
+`install` / `sync` never overwrite existing memory state; unmanaged files get `*.blueprint-conflict` siblings instead of silent overwrite.
+
+Projection & conflict policy: **[docs/how-it-works.md](docs/how-it-works.md)** · skills/rules/commands: **[docs/skills.md](docs/skills.md)** · **[docs/rules.md](docs/rules.md)** · **[docs/slash-commands.md](docs/slash-commands.md)**
+
+---
+
+## 4. Harness workflow
+
+Delivery loop after install:
+
+```mermaid
+flowchart TD
+  orient[Orient] --> start["/start branch + reset memory"]
+  start --> plan[Plan in PLANNING.md]
+  plan --> batch[Execute batch]
+  batch --> mem[Update PLANNING DECISIONS RUN_LOG HOTCACHE]
+  mem --> more{More work?}
+  more -->|yes| batch
+  more -->|no| ship[Review / commit / PR]
+  ship --> learn[LEARNING / ANTI-PATTERNS]
+```
+
+1. **Orient** — read contract + overrides + relevant skills  
+2. **`/start`** — feature/hotfix branch; reset task-scoped memory templates  
+3. **Plan** — keep `PLANNING.md` truthful  
+4. **Execute** — implement one batch  
+5. **Update memory** — planning, decisions, telemetry, hotcache together  
+6. **Ship** — `/review`, `/commit`, forge commands when installed  
+7. **Learn** — draft in `LEARNING.md`; promote only after human review  
+
+Full walkthrough: **[docs/harness-workflow.md](docs/harness-workflow.md)** · `/start`: **[docs/quick-start.md](docs/quick-start.md)** · memory: **[docs/memory-and-planning.md](docs/memory-and-planning.md)**
+
+---
+
+## 5. Docs index
+
+| Category | Doc |
+|---|---|
+| Architecture | [architecture.md](docs/architecture.md), [compatibility.md](docs/compatibility.md) |
+| Setup | [setup.md](docs/setup.md), [adoption-and-lineage.md](docs/adoption-and-lineage.md) |
+| How it works | [how-it-works.md](docs/how-it-works.md), [skills.md](docs/skills.md), [rules.md](docs/rules.md), [slash-commands.md](docs/slash-commands.md) |
+| Workflow | [harness-workflow.md](docs/harness-workflow.md), [quick-start.md](docs/quick-start.md), [memory-and-planning.md](docs/memory-and-planning.md) |
+| Index | [docs/README.md](docs/README.md) |
+
+### Package layout
 
 ```
 .
-├── VERSION / manifest.yaml
-├── blueprints/          # default | engineering | engineering-fastapi | startup
-├── harness/             # canonical shared commands, rules, skills
+├── harness/             # canonical commands, rules, skills
+├── blueprints/          # default | engineering | startup
+├── templates/           # entrypoints + memory + PRD/ADR
 ├── prompts/             # prompt library
-├── templates/           # memory + PRD/ADR/review templates
-├── docs/                # package docs
-├── scripts/agent        # init | install | update | sync | doctor
-├── AGENTS.md / CLAUDE.md
-└── examples/consumer/   # example consuming project config
+├── docs/                # diagrams + deep docs
+├── scripts/agent        # init | install | sync | doctor
+└── examples/consumer/   # example consumer install state
 ```
-
-## Not in this package (consumer-only)
-
-These are created in adopting projects by `scripts/agent init|install` or `/start`:
-
-| Artifact | Why consumer-only |
-|---|---|
-| `.cursor/` | Runtime install target generated from `harness/` + blueprint overlays |
-| `PLANNING.md` `DECISIONS.md` `RUN_LOG.md` | Task state |
-| `HOTCACHE.md` `LEARNING.md` `ANTI-PATTERNS.md` | Operational / reflection memory |
-| `.agent-blueprint.yaml` | Install state for that project |
-
-Pristine sources live under `templates/memory/` and `harness/`.
-
-## Blueprints
-
-| Blueprint | Includes |
-|---|---|
-| `default` | `/start`, `/review`, safety + planning rules, core skills, memory templates |
-| `engineering` | default + commit playbook + refactor skill + ADR/review templates |
-| `engineering-fastapi` | engineering + FastAPI/Alembic/router/key-principles rules |
-| `startup` | default + PRD/ADR templates |
-
-GitLab/`glab` MR commands are an **overlay**: `--overlay gitlab`.
-
-## Compatibility
-
-See **[docs/compatibility.md](docs/compatibility.md)**. Local overrides in consumers: `AGENTS.local.md`, `CLAUDE.local.md`, `.agent-blueprint.local.yaml`, `*.local.mdc`.
-
-## Documentation
-
-| Topic | Path |
-|---|---|
-| Docs index | [docs/README.md](docs/README.md) |
-| Compatibility layer | [docs/compatibility.md](docs/compatibility.md) |
-| `/start` ritual | [docs/quick-start.md](docs/quick-start.md) |
-| Memory layers | [docs/memory-and-planning.md](docs/memory-and-planning.md) |
-| Slash commands | [docs/slash-commands.md](docs/slash-commands.md) |
-| Adoption / lineage | [docs/adoption-and-lineage.md](docs/adoption-and-lineage.md) |

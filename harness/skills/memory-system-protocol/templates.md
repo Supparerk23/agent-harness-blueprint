@@ -42,15 +42,16 @@ High-confidence operational safety memory. Keep entries concise and actionable.
 - Do not promote every `LEARNING.md` observation into a skill or rule without human consolidation.
 
 ## Architecture Drift
-- Do not move long-running report generation or Pub/Sub processing into FastAPI routes.
-- Do not bypass existing service and worker boundaries when adding pitch-buddy or report-generation behavior.
+- Do not invent new architectural layers when an existing project pattern already covers the need.
+- Do not bypass established service, worker, or module boundaries without an explicit decision recorded in `DECISIONS.md`.
 
-## Local Test Cleanup Against Non-Local Environments
-- Do not run local helper scripts that delete report rows or call Redis `FLUSHALL` unless the environment is explicitly gated as `local` or `localhost`.
+## Environment Safety
+- Do not run cleanup scripts, mass deletes, or cache flushes against shared/staging/production environments.
+- Gate destructive local helpers so they only run when the environment is explicitly `local` or `localhost`.
 
 ```
 
-Domain-specific anti-patterns (e.g. bond pitch buddy) live in curated skills or may be re-added to `ANTI-PATTERNS.md` after human review — not on every task start.
+Domain-specific anti-patterns live in curated skills or may be re-added to `ANTI-PATTERNS.md` after human review — not on every task start.
 
 ## LEARNING.md
 
@@ -66,4 +67,4 @@ Candidate insights for human review. Not authoritative — promote to skills or 
 ## Do not reset on task start
 
 - `ARCHITECTURE.md` — system design
-- `.cursor/skills/` — curated procedural knowledge
+- Installed skill trees under the active runtime (`.cursor/skills/`, `.claude/skills/`) — curated procedural knowledge

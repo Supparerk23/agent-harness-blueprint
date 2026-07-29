@@ -74,4 +74,4 @@ ensure_glab() {
 
 ## JIRA from branch
 
-`feature/NEUR-1234` or `hotfix/NEUR-1234` → `NEUR-1234` for commit/MR titles.
+`feature/ABC-1234` or `hotfix/ABC-1234` → `ABC-1234` for commit/MR titles.

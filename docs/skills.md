@@ -1,6 +1,6 @@
 # Skills — concepts
 
-Package sources live under [harness/skills/](../harness/skills/). After install, the same folders appear under the consumer's `.cursor/skills/` as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
+Package sources live under [harness/skills/](../harness/skills/). After install, the same folders appear under the consumer's `.cursor/skills/` and/or `.claude/skills/` as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
 
 ## `planning-execution-tracking`
 
@@ -23,7 +23,7 @@ Use whenever execution must leave audit breadcrumbs—not casual Q&A.
 
 ## `refactor-code` (+ `test-strategy.md`)
 
-**Intent:** Opinionated Python simplification playbook—flatten complexity, extract duplication thoughtfully, preserve behavior. Ships with **`disable-model-invocation`** so tooling does not auto-load it—invoke deliberately when refactoring.
+**Intent:** Opinionated simplification playbook—flatten complexity, extract duplication thoughtfully, preserve behavior. Ships with **`disable-model-invocation`** so tooling does not auto-load it—invoke deliberately when refactoring.
 
 Companion **test-strategy** lays out regression priorities and safety rails. The workflow expects humans to apply risky edits/tests while the assistant analyzes and proposes increments.
 

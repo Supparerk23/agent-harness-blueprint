@@ -4,6 +4,7 @@
 
 # Adoption/runtime artifacts belong in consuming projects, not this package
 .cursor/
+.claude/
 PLANNING.md
 DECISIONS.md
 RUN_LOG.md

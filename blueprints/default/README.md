@@ -8,11 +8,11 @@ Core shared agent harness for any repository.
 - Rules: safety, planning-execution-tracking
 - Skills: memory-system-protocol, planning-execution-tracking, docs-style, skill-creator
 - Memory templates under `templates/memory/`
+- Consumer entrypoints from `templates/entrypoints/`
 
 ## Does not include
 
-- FastAPI / Alembic / router README rules
 - GitLab `glab` MR automation
-- Project-specific `key-principles`
+- Project-specific engineering etiquette
 
-Use `engineering-fastapi` or forge overlays when those are needed.
+Use `engineering` plus forge overlays (`--overlay gitlab`) when those are needed. Choose `--runtime cursor|claude|all` for the tool projection.

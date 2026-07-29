@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lightweight package-manager style CLI for shared-agent-blueprints.
-# Usage: scripts/agent {init|install|update|sync|doctor} [blueprint] [--overlay NAME] [--dry-run] [--force]
+# Usage: scripts/agent {init|install|update|sync|doctor} [blueprint] [--overlay NAME] [--runtime NAME] [--dry-run] [--force]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,6 +15,7 @@ shift || true
 
 BLUEPRINT="default"
 OVERLAY=""
+RUNTIME="all"
 DRY_RUN=0
 FORCE=0
 TARGET="."
@@ -22,6 +23,7 @@ TARGET="."
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --overlay) OVERLAY="${2:-}"; shift 2 ;;
+    --runtime) RUNTIME="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --force) FORCE=1; shift ;;
     --target) TARGET="${2:-.}"; shift 2 ;;
@@ -30,13 +32,7 @@ while [[ $# -gt 0 ]]; do
       exit 2
       ;;
     *)
-      if [[ "$cmd" == "install" && "$BLUEPRINT" == "default" && "$1" != "default" ]]; then
-        BLUEPRINT="$1"
-      elif [[ "$cmd" != "install" ]]; then
-        BLUEPRINT="$1"
-      else
-        BLUEPRINT="$1"
-      fi
+      BLUEPRINT="$1"
       shift
       ;;
   esac
@@ -63,9 +59,25 @@ resolve_blueprint_dir() {
   case "$name" in
     default) echo "${ROOT}/blueprints/default" ;;
     engineering) echo "${ROOT}/blueprints/engineering" ;;
-    engineering-fastapi|fastapi) echo "${ROOT}/blueprints/engineering/fastapi" ;;
     startup) echo "${ROOT}/blueprints/startup" ;;
-    *) die "unknown blueprint: $name (default|engineering|engineering-fastapi|startup)" ;;
+    *) die "unknown blueprint: $name (default|engineering|startup)" ;;
+  esac
+}
+
+normalize_runtimes() {
+  case "$1" in
+    cursor) echo "cursor" ;;
+    claude) echo "claude" ;;
+    all) echo "cursor claude" ;;
+    *) die "unknown runtime: $1 (cursor|claude|all)" ;;
+  esac
+}
+
+runtime_root_name() {
+  case "$1" in
+    cursor) echo ".cursor" ;;
+    claude) echo ".claude" ;;
+    *) die "unknown runtime: $1" ;;
   esac
 }
 
@@ -120,27 +132,54 @@ copy_file() {
   log "installed: $dest"
 }
 
-install_harness_defaults() {
-  local dest_root="$1"
-  local cursor="${dest_root}/.cursor"
-
-  # Shared harness -> compatibility runtime (.cursor)
-  copy_file "${ROOT}/harness/commands/start.md" "${cursor}/commands/start.md"
-  copy_file "${ROOT}/harness/commands/review.md" "${cursor}/commands/review.md"
-  copy_file "${ROOT}/harness/commands/commit.md" "${cursor}/commands/commit.md"
-  copy_file "${ROOT}/harness/rules/safety-rules.mdc" "${cursor}/rules/safety-rules.mdc"
-  copy_file "${ROOT}/harness/rules/planning-execution-tracking.mdc" "${cursor}/rules/planning-execution-tracking.mdc"
-
+install_skills_into() {
+  local dest_skills="$1"
+  local skill
   for skill in memory-system-protocol planning-execution-tracking docs-style skill-creator refactor-code; do
     if [[ -d "${ROOT}/harness/skills/${skill}" ]]; then
-      mkdir -p "${cursor}/skills/${skill}"
+      mkdir -p "${dest_skills}/${skill}"
       # shellcheck disable=SC2044
       for f in $(find "${ROOT}/harness/skills/${skill}" -type f); do
         rel="${f#"${ROOT}/harness/skills/${skill}/"}"
-        copy_file "$f" "${cursor}/skills/${skill}/${rel}"
+        copy_file "$f" "${dest_skills}/${skill}/${rel}"
       done
     fi
   done
+}
+
+install_rules_into() {
+  local dest_rules="$1"
+  local runtime="$2"
+  local src_rule dest_name
+  for src_rule in safety-rules.mdc planning-execution-tracking.mdc; do
+    if [[ "$runtime" == "claude" ]]; then
+      dest_name="${src_rule%.mdc}.md"
+    else
+      dest_name="$src_rule"
+    fi
+    copy_file "${ROOT}/harness/rules/${src_rule}" "${dest_rules}/${dest_name}"
+  done
+}
+
+install_commands_into() {
+  local dest_commands="$1"
+  shift
+  local name
+  for name in "$@"; do
+    copy_file "${ROOT}/harness/commands/${name}" "${dest_commands}/${name}"
+  done
+}
+
+install_runtime() {
+  local dest_root="$1"
+  local runtime="$2"
+  local rt_root
+  rt_root="$(runtime_root_name "$runtime")"
+  local base="${dest_root}/${rt_root}"
+
+  install_commands_into "${base}/commands" start.md review.md commit.md
+  install_rules_into "${base}/rules" "$runtime"
+  install_skills_into "${base}/skills"
 }
 
 install_memory_templates_if_absent() {
@@ -167,59 +206,107 @@ install_memory_templates_if_absent() {
 
 install_compat_docs() {
   local dest_root="$1"
-  copy_file "${ROOT}/AGENTS.md" "${dest_root}/AGENTS.md"
-  copy_file "${ROOT}/CLAUDE.md" "${dest_root}/CLAUDE.md"
+  copy_file "${ROOT}/templates/entrypoints/AGENTS.md" "${dest_root}/AGENTS.md"
+  copy_file "${ROOT}/templates/entrypoints/CLAUDE.md" "${dest_root}/CLAUDE.md"
 }
 
-install_fastapi_profile() {
-  local dest_root="$1"
-  local src="${ROOT}/blueprints/engineering/fastapi/rules"
-  local dest="${dest_root}/.cursor/rules"
-  for f in fastapi-guidelines.mdc alembic-cli-migrations-only.mdc router-endpoint-readme-sync.mdc key-principles.mdc; do
-    copy_file "${src}/${f}" "${dest}/${f}"
-  done
-}
-
-install_gitlab_overlay() {
-  local dest_root="$1"
+install_gitlab_overlay_into() {
+  local dest_commands="$1"
   local src="${ROOT}/blueprints/engineering/gitlab/commands"
-  local dest="${dest_root}/.cursor/commands"
+  local f
   for f in prerequisite.md pr.md fix-comment.md sync-dev.md; do
-    copy_file "${src}/${f}" "${dest}/${f}"
+    copy_file "${src}/${f}" "${dest_commands}/${f}"
   done
 }
 
 write_state() {
   local dest_root="$1"
   local bp="$2"
+  local runtimes_csv="$3"
   local ver
   ver="$(package_version)"
   local out="${dest_root}/${STATE_FILE}"
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    log "dry-run state: $out (blueprint=$bp version=$ver)"
+    log "dry-run state: $out (blueprint=$bp version=$ver runtimes=$runtimes_csv)"
     return 0
   fi
+  # YAML list from space-separated runtimes
+  local rt_yaml=""
+  local r
+  for r in $runtimes_csv; do
+    rt_yaml="${rt_yaml}
+  - ${r}"
+  done
   cat > "$out" <<EOF
 # Generated by scripts/agent — do not commit secrets here.
 source: ${ROOT}
 version: ${ver}
 blueprint: ${bp}
 overlay: ${OVERLAY:-null}
+runtimes:${rt_yaml}
 installed_at_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 conflict_policy: preserve-local
-runtime_root: .cursor
 EOF
   log "wrote: $out"
+}
+
+read_state_field() {
+  local state="$1"
+  local field="$2"
+  local default="${3:-}"
+  if [[ -f "$state" ]]; then
+    grep -E "^${field}:" "$state" | head -1 | awk '{print $2}'
+  else
+    echo "$default"
+  fi
+}
+
+read_state_runtimes() {
+  local state="$1"
+  if [[ ! -f "$state" ]]; then
+    echo ""
+    return 0
+  fi
+  # Prefer explicit runtimes list; fall back to legacy runtime_root
+  local has_runtimes_key=0
+  local listed
+  listed="$(awk '
+    /^runtimes:/ { in_rt=1; print "__KEY__"; next }
+    in_rt && /^  - / { gsub(/^  - /,""); print; next }
+    in_rt && /^[^ ]/ { in_rt=0 }
+  ' "$state")"
+  if echo "$listed" | grep -q '^__KEY__$'; then
+    has_runtimes_key=1
+    listed="$(echo "$listed" | grep -v '^__KEY__$')"
+  fi
+  if [[ "$has_runtimes_key" -eq 1 ]]; then
+    # May be empty after init (no tool runtime yet)
+    if [[ -z "$listed" ]]; then
+      echo ""
+    else
+      echo "$listed" | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+    fi
+    return 0
+  fi
+  local legacy
+  legacy="$(read_state_field "$state" runtime_root "")"
+  case "$legacy" in
+    .cursor) echo "cursor" ;;
+    .claude) echo "claude" ;;
+    *) echo "" ;;
+  esac
 }
 
 cmd_init() {
   local dest_root="$TARGET"
   mkdir -p "$dest_root"
   need_file "$MANIFEST"
+  need_file "${ROOT}/templates/entrypoints/AGENTS.md"
+  need_file "${ROOT}/templates/entrypoints/CLAUDE.md"
   install_compat_docs "$dest_root"
   install_memory_templates_if_absent "$dest_root"
   if [[ ! -f "${dest_root}/${STATE_FILE}" ]]; then
-    write_state "$dest_root" "default"
+    write_state "$dest_root" "default" ""
   else
     log "preserve: ${dest_root}/${STATE_FILE}"
   fi
@@ -233,7 +320,7 @@ cmd_init() {
 EOF
     log "wrote: ${dest_root}/${LOCAL_OVERRIDE}"
   fi
-  log "init complete (blueprint=default pending install)"
+  log "init complete (shared entrypoints + memory; run install --runtime to project tool runtimes)"
 }
 
 cmd_install() {
@@ -243,36 +330,41 @@ cmd_install() {
   need_file "${bp_dir}/blueprint.yaml"
   need_file "$MANIFEST"
 
-  log "installing blueprint: $BLUEPRINT -> $dest_root"
-  install_harness_defaults "$dest_root"
+  local runtimes
+  runtimes="$(normalize_runtimes "$RUNTIME")"
+
+  log "installing blueprint: $BLUEPRINT -> $dest_root (runtimes: $runtimes)"
   install_compat_docs "$dest_root"
   install_memory_templates_if_absent "$dest_root"
 
-  case "$BLUEPRINT" in
-    engineering)
-      copy_file "${ROOT}/harness/commands/commit.md" "${dest_root}/.cursor/commands/commit.md"
-      ;;
-    engineering-fastapi|fastapi)
-      copy_file "${ROOT}/harness/commands/commit.md" "${dest_root}/.cursor/commands/commit.md"
-      install_fastapi_profile "$dest_root"
-      ;;
-    startup)
-      mkdir -p "${dest_root}/templates"
-      copy_file "${ROOT}/templates/prd.md" "${dest_root}/templates/prd.md"
-      copy_file "${ROOT}/templates/adr.md" "${dest_root}/templates/adr.md"
-      ;;
-  esac
+  local rt
+  for rt in $runtimes; do
+    install_runtime "$dest_root" "$rt"
+    local rt_root
+    rt_root="$(runtime_root_name "$rt")"
 
-  if [[ "$OVERLAY" == "gitlab" ]]; then
-    install_gitlab_overlay "$dest_root"
-  fi
+    case "$BLUEPRINT" in
+      engineering)
+        copy_file "${ROOT}/harness/commands/commit.md" "${dest_root}/${rt_root}/commands/commit.md"
+        ;;
+      startup)
+        mkdir -p "${dest_root}/templates"
+        copy_file "${ROOT}/templates/prd.md" "${dest_root}/templates/prd.md"
+        copy_file "${ROOT}/templates/adr.md" "${dest_root}/templates/adr.md"
+        ;;
+    esac
+
+    if [[ "$OVERLAY" == "gitlab" ]]; then
+      install_gitlab_overlay_into "${dest_root}/${rt_root}/commands"
+    fi
+  done
 
   # Shared templates useful for all installs
   mkdir -p "${dest_root}/templates"
   copy_file "${ROOT}/templates/review-checklist.md" "${dest_root}/templates/review-checklist.md"
   copy_file "${ROOT}/templates/adr.md" "${dest_root}/templates/adr.md"
 
-  write_state "$dest_root" "$BLUEPRINT"
+  write_state "$dest_root" "$BLUEPRINT" "$runtimes"
   log "install complete"
 }
 
@@ -283,7 +375,7 @@ cmd_update() {
   local latest
   latest="$(package_version)"
   if [[ -f "$state" ]]; then
-    current="$(grep -E '^version:' "$state" | head -1 | awk '{print $2}')"
+    current="$(read_state_field "$state" version unknown)"
   fi
   log "installed version: ${current}"
   log "package version:   ${latest}"
@@ -303,15 +395,29 @@ cmd_sync() {
   local state="${dest_root}/${STATE_FILE}"
   local bp="default"
   if [[ -f "$state" ]]; then
-    bp="$(grep -E '^blueprint:' "$state" | head -1 | awk '{print $2}')"
+    bp="$(read_state_field "$state" blueprint default)"
     local ov
-    ov="$(grep -E '^overlay:' "$state" | head -1 | awk '{print $2}')"
+    ov="$(read_state_field "$state" overlay "")"
     if [[ -n "$ov" && "$ov" != "null" ]]; then
       OVERLAY="$ov"
     fi
+    # Only override RUNTIME from state when caller left default "all"
+    # and state has an explicit list — sync should re-apply installed runtimes.
+    local state_rts
+    state_rts="$(read_state_runtimes "$state")"
+    if [[ -n "$state_rts" ]]; then
+      if [[ "$state_rts" == *"cursor"* && "$state_rts" == *"claude"* ]]; then
+        RUNTIME="all"
+      else
+        # single runtime name
+        RUNTIME="$(echo "$state_rts" | awk '{print $1}')"
+      fi
+    else
+      die "no runtimes in ${STATE_FILE}; run: scripts/agent install <blueprint> --runtime all"
+    fi
   fi
   BLUEPRINT="$bp"
-  log "syncing blueprint: $BLUEPRINT (preserve-local)"
+  log "syncing blueprint: $BLUEPRINT runtime=$RUNTIME (preserve-local)"
   cmd_install
 }
 
@@ -337,7 +443,7 @@ cmd_doctor() {
     log "mode: consumer-target"
   fi
 
-  for d in blueprints/default harness/commands harness/rules harness/skills templates/memory prompts/system scripts; do
+  for d in blueprints/default harness/commands harness/rules harness/skills templates/memory templates/entrypoints prompts/system scripts; do
     if [[ ! -e "${ROOT}/$d" ]]; then
       warn "missing package path: $d"
       errors=$((errors + 1))
@@ -348,7 +454,7 @@ cmd_doctor() {
 
   # Package must not contain adoption/runtime artifacts
   if [[ "$package_mode" -eq 1 ]]; then
-    for bad in .cursor PLANNING.md DECISIONS.md RUN_LOG.md HOTCACHE.md LEARNING.md ANTI-PATTERNS.md; do
+    for bad in .cursor .claude PLANNING.md DECISIONS.md RUN_LOG.md HOTCACHE.md LEARNING.md ANTI-PATTERNS.md; do
       if [[ -e "${dest_root}/${bad}" ]]; then
         warn "package should not contain consumer artifact: $bad"
         errors=$((errors + 1))
@@ -357,16 +463,44 @@ cmd_doctor() {
       fi
     done
   else
-    if [[ -d "${dest_root}/.cursor" ]]; then
-      log "ok: runtime .cursor present"
-    else
-      warn "runtime .cursor missing (run: scripts/agent install <blueprint>)"
-      errors=$((errors + 1))
-    fi
-    if [[ -f "${dest_root}/${STATE_FILE}" ]]; then
+    local state="${dest_root}/${STATE_FILE}"
+    if [[ -f "$state" ]]; then
       log "ok: ${STATE_FILE}"
     else
       warn "no ${STATE_FILE} (run init/install)"
+      errors=$((errors + 1))
+    fi
+
+    local declared
+    declared="$(read_state_runtimes "$state")"
+    if [[ -z "$declared" ]]; then
+      warn "no tool runtime installed yet (run: scripts/agent install <blueprint> --runtime all)"
+      errors=$((errors + 1))
+    else
+      local found_runtime=0
+      local rt rt_root
+      for rt in cursor claude; do
+        rt_root="$(runtime_root_name "$rt")"
+        if [[ -d "${dest_root}/${rt_root}" ]]; then
+          if echo " $declared " | grep -q " $rt "; then
+            log "ok: runtime ${rt_root} present (declared)"
+            found_runtime=1
+          else
+            log "info: runtime ${rt_root} present but not declared in state"
+          fi
+        else
+          if echo " $declared " | grep -q " $rt "; then
+            warn "declared runtime ${rt_root} missing (run: scripts/agent install <blueprint> --runtime ${rt}|all)"
+            errors=$((errors + 1))
+          else
+            log "info: runtime ${rt_root} not installed"
+          fi
+        fi
+      done
+      if [[ "$found_runtime" -eq 0 ]]; then
+        warn "no declared tool runtime directory found"
+        errors=$((errors + 1))
+      fi
     fi
   fi
 
@@ -401,17 +535,18 @@ usage() {
 Usage: scripts/agent <command> [blueprint] [flags]
 
 Commands:
-  init                 Create local state + memory files if absent
-  install <blueprint>  Install blueprint into --target (default .)
+  init                 Write AGENTS.md, CLAUDE.md, memory files (no tool runtime)
+  install <blueprint>  Install blueprint into --target runtimes
   update               Show update plan vs package VERSION
   sync                 Re-apply installed blueprint with preserve-local
   doctor               Validate package + target install health
 
 Blueprints:
-  default | engineering | engineering-fastapi | startup
+  default | engineering | startup
 
 Flags:
   --overlay gitlab     Install GitLab/glab command overlay
+  --runtime NAME       cursor | claude | all (default: all)
   --target PATH        Consumer project root (default .)
   --dry-run            Print actions without writing
   --force              Overwrite unmanaged files

@@ -1,4 +1,6 @@
-# Slash commands (`harness/commands/` → consumer `.cursor/commands`)
+# Slash commands (`harness/commands/` → consumer runtime `commands/`)
+
+After install, the same playbooks appear under `.cursor/commands/` and/or `.claude/commands/`.
 
 | Command | Source | Purpose |
 |---|---|---|
