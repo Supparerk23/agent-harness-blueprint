@@ -23,13 +23,33 @@ Use whenever execution must leave audit breadcrumbs—not casual Q&A.
 
 ## `refactor-code` (+ `test-strategy.md`)
 
-**Intent:** Opinionated simplification playbook—flatten complexity, extract duplication thoughtfully, preserve behavior. Ships with **`disable-model-invocation`** so tooling does not auto-load it—invoke deliberately when refactoring.
+**Intent:** Opinionated simplification playbook—flatten complexity, extract duplication thoughtfully, preserve behavior (any programming language). Ships with **`disable-model-invocation`** so tooling does not auto-load it—invoke deliberately when refactoring.
 
-Companion **test-strategy** lays out regression priorities and safety rails. The workflow expects humans to apply risky edits/tests while the assistant analyzes and proposes increments.
+**Required pairing:** when active, also enable `/ponytail` (see HARNESS skill use cases). Companion **test-strategy** lays out regression priorities and safety rails. The workflow expects humans to apply risky edits/tests while the assistant analyzes and proposes increments.
 
 ## `docs-style`
 
 **Intent:** Opinionated docs layout—thin root `README`, deeper material inside `docs/` plus guidance for richer `ARCHITECTURE.md` write-ups (Mermaid, lifecycle fidelity). Also `disable-model-invocation`; use when refactoring documentation IA.
+
+## `i-have-adhd`
+
+**Intent:** ADHD-friendly agent output — lead with the next action, number multi-step work, restate state each turn, suppress tangents, concrete time estimates, no preamble/closers. Invoke with `/i-have-adhd`; stays on until `stop adhd mode`.
+
+Vendored from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (MIT). Ships with `disable-model-invocation`.
+
+## `ponytail` (+ review / audit / debt / gain / help)
+
+**Intent:** Minimal-code bias — YAGNI ladder before writing (skip / reuse / stdlib / native / dependency / one line / minimum). Default intensity `full`; switch with `/ponytail lite|full|ultra|off`. Companion skills:
+
+- `ponytail-review` — delete-list for over-engineering in the current diff
+- `ponytail-audit` — repo-wide over-engineering audit
+- `ponytail-debt` — harvest deferred `ponytail:` shortcuts
+- `ponytail-gain` — benchmark impact scoreboard reference
+- `ponytail-help` — command quick reference
+
+Vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT).
+
+**Required with `refactor-code`:** invoking `/refactor-code` must also enable `/ponytail` for that session.
 
 ## `skill-creator`
 

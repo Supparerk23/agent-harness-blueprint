@@ -10,8 +10,41 @@ Create a merge request (MR) for the current branch. This repo uses **GitLab** â€
    - Types: feat|fix|refactor|test|docs|chore
    - Keep under 72 chars
 
-2. Generated description:
-   - Context from `PLANNING.md` and `DECISIONS.md` when present
+2. Generate the MR description using this template (fill every relevant section):
+
+```markdown
+# Merge Request
+
+## Summary
+<!-- Max 1â€“2 lines. Do not include filenames. -->
+-
+-
+
+## Reviewer Notes (Optional)
+Areas that need special attention:
+-
+
+## Testing
+- [ ] Unit Test
+- [ ] Manual Test
+
+## Risk
+- [ ] Low / refactor
+- [ ] Medium / Add Business Logic (New Thing)
+- [ ] High / Breaking Change / Change Business Logic / Journey Change (FN/BN)
+
+## Screenshots (Optional)
+<!-- UI changes -->
+
+## Optional Reviewer
+
+```
+
+Summary rules:
+- Maximum **1â€“2 lines**
+- **Do not** include filenames in the summary
+- Prefer outcome/intent over file lists
+- Mark the matching Risk checkbox; leave Testing checkboxes for the author/reviewer unless tests were already run
 
 3. Run `ensure_glab` (see [prerequisite.md](prerequisite.md)).
 
@@ -35,7 +68,31 @@ Create a merge request (MR) for the current branch. This repo uses **GitLab** â€
    glab mr create \
      --title "JIRA | ðŸ¤– type(scope): description" \
      --description "$(cat <<'EOF'
-   [Generated description]
+   # Merge Request
+
+   ## Summary
+   <!-- Max 1â€“2 lines. Do not include filenames. -->
+   - <outcome line 1>
+   - <outcome line 2 if needed>
+
+   ## Reviewer Notes (Optional)
+   Areas that need special attention:
+   - <notes or leave blank>
+
+   ## Testing
+   - [ ] Unit Test
+   - [ ] Manual Test
+
+   ## Risk
+   - [ ] Low / refactor
+   - [ ] Medium / Add Business Logic (New Thing)
+   - [ ] High / Breaking Change / Change Business Logic / Journey Change (FN/BN)
+
+   ## Screenshots (Optional)
+   <!-- UI changes -->
+
+   ## Optional Reviewer
+
    EOF
    )" \
      --target-branch "$TARGET_BRANCH" \
@@ -57,14 +114,14 @@ Create a merge request (MR) for the current branch. This repo uses **GitLab** â€
        '{source_branch:$source,target_branch:$target,title:$title,description:$description,draft:true,labels:"ai-generated"}')" \
      "${GITLAB_API_BASE}/projects/${GITLAB_PROJECT_PATH_ENC}/merge_requests"
    ```
-   Parse `web_url` from JSON.
+   Parse `web_url` from JSON. Use the same Merge Request description template for `$description`.
 
    **C. Web UI â€” last resort**
    ```bash
    ensure_glab
    echo "${GITLAB_WEB_BASE}/-/merge_requests/new?merge_request%5Bsource_branch%5D=${BRANCH}&merge_request%5Btarget_branch%5D=${TARGET_BRANCH}"
    ```
-   Ask the user to paste title/description, enable **Draft**, add label `ai-generated`.
+   Ask the user to paste title/description (using the template above), enable **Draft**, add label `ai-generated`.
 
 7. Return the MR URL (`glab` stdout or API `web_url`).
 
@@ -76,3 +133,4 @@ Create a merge request (MR) for the current branch. This repo uses **GitLab** â€
 - MR title: `JIRA | ðŸ¤– type(scope): description`
 - Label `ai-generated` on AI-created MRs
 - Do not create a duplicate if an open MR already exists for the branch
+- Summary: max 1â€“2 lines; never list filenames in Summary

@@ -1,5 +1,5 @@
 name: default
-version: 1.0.0
+# Tracks package VERSION (./VERSION) — do not hardcode a semver here.
 extends: null
 description: Core shared agent harness — memory protocol, planning, safety, docs.
 
@@ -16,6 +16,13 @@ includes:
       - planning-execution-tracking
       - docs-style
       - skill-creator
+      - i-have-adhd
+      - ponytail
+      - ponytail-review
+      - ponytail-audit
+      - ponytail-debt
+      - ponytail-gain
+      - ponytail-help
   prompts:
     commands:
       - start.md

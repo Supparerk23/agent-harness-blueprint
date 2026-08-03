@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lightweight package-manager style CLI for shared-agent-blueprints.
-# Usage: ./blueprint {init|install|update|sync|doctor} [blueprint] [--overlay NAME] [--runtime NAME] [--dry-run] [--force]
+# Usage: ./blueprint {init|install|update|sync|del|doctor} [blueprint] [--overlay NAME] [--runtime NAME] [--dry-run] [--force]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,6 +27,8 @@ source "${ROOT}/lib/blueprint/targets.sh"
 source "${ROOT}/lib/blueprint/session.sh"
 # shellcheck source=lib/blueprint/repo.sh
 source "${ROOT}/lib/blueprint/repo.sh"
+# shellcheck source=lib/blueprint/harness.sh
+source "${ROOT}/lib/blueprint/harness.sh"
 
 term_init
 
@@ -265,11 +267,81 @@ need_file() {
 }
 
 package_version() {
+  # Single source of truth: package-root ./VERSION (not manifest.yaml).
   if [[ -f "$VERSION_FILE" ]]; then
     tr -d '[:space:]' < "$VERSION_FILE"
   else
     echo "0.0.0"
   fi
+}
+
+# Normalize version for comparison (strip leading v / whitespace).
+normalize_version() {
+  local v="${1:-}"
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  v="${v#v}"
+  v="${v#V}"
+  printf '%s' "$v"
+}
+
+versions_equal() {
+  local a b
+  a="$(normalize_version "$1")"
+  b="$(normalize_version "$2")"
+  [[ -n "$a" && -n "$b" && "$a" == "$b" ]]
+}
+
+# Rough file-count estimate for managed runtime projections (loading bar total).
+estimate_managed_copy_total() {
+  local runtimes="${1:-}"
+  local skills=0
+  skills="$(find "${PACKAGE_ROOT}/harness/skills" -type f 2>/dev/null | wc -l | tr -d ' ')"
+  if [[ ! "$skills" =~ ^[0-9]+$ ]]; then
+    skills=20
+  fi
+  local rt_n=0
+  local r
+  for r in $runtimes; do
+    rt_n=$((rt_n + 1))
+  done
+  if [[ "$rt_n" -eq 0 ]]; then
+    printf '%s' "12"
+    return 0
+  fi
+  # skills + commands/rules/templates/overlay overhead per runtime + shared skips
+  printf '%s' "$((skills * rt_n + 12 * rt_n + 8))"
+}
+
+# Apply managed runtime projections for installed blueprint (skills/commands/rules/templates).
+# Does not modify AGENTS.md / agents.md / CLAUDE.md.
+apply_managed_runtime_projections() {
+  local dest_root="$1"
+  local bp="$2"
+  local runtimes="$3"
+  local rt
+  install_compat_docs "$dest_root"
+  install_gitignore "$dest_root"
+  for rt in $runtimes; do
+    install_runtime "$dest_root" "$rt"
+    local rt_root
+    rt_root="$(runtime_root_name "$rt")"
+    local rt_templates="${dest_root}/${rt_root}/templates"
+    mkdir -p "$rt_templates"
+    copy_file "${PACKAGE_ROOT}/templates/review-checklist.md" "${rt_templates}/review-checklist.md"
+    copy_file "${PACKAGE_ROOT}/templates/adr.md" "${rt_templates}/adr.md"
+    case "$bp" in
+      engineering)
+        copy_file "${PACKAGE_ROOT}/harness/commands/commit.md" "${dest_root}/${rt_root}/commands/commit.md"
+        ;;
+      startup)
+        copy_file "${PACKAGE_ROOT}/templates/prd.md" "${rt_templates}/prd.md"
+        ;;
+    esac
+    if [[ "$OVERLAY" == "gitlab" ]]; then
+      install_gitlab_overlay_into "${dest_root}/${rt_root}/commands"
+    fi
+  done
 }
 
 resolve_blueprint_dir() {
@@ -345,19 +417,21 @@ Select AI runtime to install into the target project.
   1) cursor   Cursor IDE        (.cursor/)  — ${cursor_hint}
   2) claude   Claude Code       (.claude/)  — ${claude_hint}
   3) all      Cursor + Claude   (both)
-  4) cancel
+
+  Esc) back
 
 EOF
   local choice=""
   while true; do
-    printf 'Runtime [1-4]: '
-    read -r choice || true
+    if ! term_prompt_read 'Runtime [1-3] (Esc back): '; then
+      return 1
+    fi
+    choice="${BP_READ_RESULT:-}"
     case "$choice" in
       1|cursor|c) RUNTIME="cursor"; break ;;
       2|claude) RUNTIME="claude"; break ;;
       3|all|a) RUNTIME="all"; break ;;
-      4|q|cancel|"") return 1 ;;
-      *) warn "invalid choice: $choice (use 1-4)" ;;
+      *) warn "invalid choice: $choice (use 1-3, or Esc)" ;;
     esac
   done
   emit_info "selected runtime: $RUNTIME"
@@ -441,7 +515,7 @@ copy_file() {
 install_skills_into() {
   local dest_skills="$1"
   local skill
-  for skill in memory-system-protocol planning-execution-tracking docs-style skill-creator refactor-code; do
+  for skill in memory-system-protocol planning-execution-tracking docs-style skill-creator refactor-code i-have-adhd ponytail ponytail-review ponytail-audit ponytail-debt ponytail-gain ponytail-help; do
     if [[ -d "${PACKAGE_ROOT}/harness/skills/${skill}" ]]; then
       mkdir -p "${dest_skills}/${skill}"
       # shellcheck disable=SC2044
@@ -510,10 +584,17 @@ install_memory_templates_if_absent() {
   done
 }
 
+# Legacy name kept for install/sync call sites.
+# Agent instruction files (AGENTS.md / agents.md / CLAUDE.md) are user-owned after
+# init; install/sync must not overwrite them. HARNESS.md is owned by `update`.
 install_compat_docs() {
   local dest_root="$1"
-  copy_file "${PACKAGE_ROOT}/templates/entrypoints/AGENTS.md" "${dest_root}/AGENTS.md"
-  copy_file "${PACKAGE_ROOT}/templates/entrypoints/CLAUDE.md" "${dest_root}/CLAUDE.md"
+  local f
+  for f in AGENTS.md agents.md CLAUDE.md; do
+    if harness_exact_exists "$dest_root" "$f"; then
+      emit_file_skipped "$(harness_exact_path "$dest_root" "$f")" "preserve agent instructions"
+    fi
+  done
 }
 
 install_gitignore() {
@@ -562,6 +643,59 @@ install_gitignore() {
     cp "$src" "$dest"
     emit_file_added "$dest"
   fi
+}
+
+# Strip the managed .gitignore block; leave all other ignore rules intact.
+remove_gitignore_managed_section() {
+  local dest_root="$1"
+  local dest="${dest_root}/.gitignore"
+  local begin="# --- shared-agent-blueprints (managed) ---"
+  local end="# --- end shared-agent-blueprints ---"
+
+  if [[ ! -f "$dest" ]]; then
+    return 0
+  fi
+  if ! grep -qF "$begin" "$dest" 2>/dev/null; then
+    emit_file_skipped "$dest" "no managed section"
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    emit_info "dry-run: would remove managed .gitignore section from $dest"
+    return 0
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+  awk -v begin="$begin" -v end="$end" '
+    $0 == begin { skip=1; next }
+    skip && $0 == end { skip=0; next }
+    skip { next }
+    { print }
+  ' "$dest" > "$tmp"
+  mv "$tmp" "$dest"
+  emit_file_updated "$dest"
+}
+
+# Remove a managed path under the target (file or directory). Paths must be absolute
+# under dest_root — callers never pass user-supplied relative escape paths.
+del_remove_path() {
+  local path="$1"
+  if [[ ! -e "$path" ]]; then
+    return 0
+  fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    emit_info "dry-run: would remove $path"
+    BP_COUNT_REMOVED=$((BP_COUNT_REMOVED + 1))
+    BP_COUNT_CHECKED=$((BP_COUNT_CHECKED + 1))
+    return 0
+  fi
+  if [[ -d "$path" ]]; then
+    /bin/rm -rf "$path"
+  else
+    /bin/rm -f "$path"
+  fi
+  emit_file_removed "$path"
 }
 
 install_gitlab_overlay_into() {
@@ -633,9 +767,18 @@ write_state() {
     rt_yaml="${rt_yaml}
   - ${r}"
   done
+  local agents_entrypoint="AGENTS.md"
+  if [[ "${HARNESS_SELECTED_SOURCE:-}" == "agents.md" ]]; then
+    agents_entrypoint="agents.md"
+  elif harness_exact_exists "$dest_root" "AGENTS.md"; then
+    agents_entrypoint="AGENTS.md"
+  elif harness_exact_exists "$dest_root" "agents.md"; then
+    agents_entrypoint="agents.md"
+  fi
   cat > "$out" <<EOF
 # Generated by ./blueprint — do not commit secrets here.
 # source is a portable repo/package identity (URL triggers remote fetch/cache).
+schema_version: 1
 source: ${src_ref}
 version: ${ver}
 blueprint: ${bp}
@@ -643,6 +786,16 @@ overlay: ${OVERLAY:-null}
 runtimes:${rt_yaml}
 installed_at_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 conflict_policy: preserve-local
+harness:
+  entrypoint: HARNESS.md
+  managed: true
+  version: "${ver}"
+agents:
+  entrypoint: ${agents_entrypoint}
+  reference_managed_on_init_only: true
+compatibility:
+  preserve_existing_agents: true
+  preserve_existing_claude: true
 EOF
   emit_file_added "$out"
   targets_upsert "$dest_root" "$ver" || true
@@ -706,14 +859,59 @@ cmd_init() {
 
   emit_phase_start "Loading configuration"
   need_file "$MANIFEST"
-  need_file "${PACKAGE_ROOT}/templates/entrypoints/AGENTS.md"
-  need_file "${PACKAGE_ROOT}/templates/entrypoints/CLAUDE.md"
+  need_file "${PACKAGE_ROOT}/templates/entrypoints/HARNESS.md"
   need_file "${PACKAGE_ROOT}/templates/gitignore"
   emit_phase_complete "Loading configuration"
 
   session_start "$dest_root" "init" "$(package_source_ref)"
-  emit_phase_start "Copying files"
-  install_compat_docs "$dest_root"
+  emit_phase_start "Installing harness"
+  progress_bar_begin 16
+
+  detect_agent_entrypoint "$dest_root"
+  local w
+  if ((${#HARNESS_WARNINGS[@]} > 0)); then
+    for w in "${HARNESS_WARNINGS[@]}"; do
+      emit_warning "$w"
+    done
+  fi
+
+  ensure_harness_file "$dest_root" "$(package_version)" || {
+    emit_phase_complete "Installing harness"
+    bp_end_failure
+    exit 1
+  }
+
+  # Create greenfield AGENTS.md from template when neither agents file exists,
+  # then inject/reconcile only the managed harness reference section.
+  if [[ "$HARNESS_SELECTED_SOURCE" == "created" && ! -f "$HARNESS_SELECTED_PATH" && "$DRY_RUN" -eq 0 ]]; then
+    local agents_tmpl="${PACKAGE_ROOT}/templates/entrypoints/AGENTS.md"
+    if [[ -f "$agents_tmpl" ]]; then
+      if ! harness_atomic_copy "$agents_tmpl" "$HARNESS_SELECTED_PATH"; then
+        emit_error "failed to create AGENTS.md"
+        bp_end_failure
+        exit 1
+      fi
+      emit_file_added "$HARNESS_SELECTED_PATH"
+      HARNESS_SUMMARY_AGENT="Created AGENTS.md"
+    fi
+  elif [[ "$HARNESS_SELECTED_SOURCE" == "AGENTS.md" ]]; then
+    HARNESS_SUMMARY_AGENT="Found existing AGENTS.md"
+  elif [[ "$HARNESS_SELECTED_SOURCE" == "agents.md" ]]; then
+    HARNESS_SUMMARY_AGENT="Found existing agents.md"
+  fi
+
+  if ! ensure_harness_reference "$HARNESS_SELECTED_PATH"; then
+    # Malformed markers are non-fatal warnings; continue init for other artifacts.
+    :
+  fi
+
+  # CLAUDE.md is user-owned: never create or modify during init.
+  if [[ "$HARNESS_CLAUDE_DETECTED" -eq 1 ]]; then
+    HARNESS_SUMMARY_CLAUDE="Found CLAUDE.md (left unchanged)"
+  else
+    HARNESS_SUMMARY_CLAUDE="CLAUDE.md not present"
+  fi
+
   install_memory_templates_if_absent "$dest_root"
   install_gitignore "$dest_root"
   if [[ ! -f "${dest_root}/${STATE_FILE}" ]]; then
@@ -736,8 +934,9 @@ cmd_init() {
 EOF
     emit_file_added "${dest_root}/${LOCAL_OVERRIDE}"
   fi
-  emit_phase_complete "Copying files"
-  emit_info "init complete (shared entrypoints + memory; run install --runtime to project tool runtimes)"
+  emit_phase_complete "Installing harness"
+  print_init_harness_summary
+  emit_info "init complete (HARNESS.md + agent reference; run install --runtime to project tool runtimes)"
   bp_end_success
 }
 
@@ -769,6 +968,7 @@ cmd_install() {
 
   emit_phase_start "Copying files"
   emit_info "installing blueprint: $BLUEPRINT -> $dest_root (runtimes: $runtimes)"
+  progress_bar_begin "$(estimate_managed_copy_total "$runtimes")"
   install_compat_docs "$dest_root"
   install_memory_templates_if_absent "$dest_root"
   install_gitignore "$dest_root"
@@ -811,24 +1011,150 @@ cmd_update() {
   local state="${dest_root}/${STATE_FILE}"
   local current="unknown"
   local latest
+  local current_n latest_n
   PACKAGE_ROOT="$ROOT"
   refresh_package_paths
+  need_file "${PACKAGE_ROOT}/templates/entrypoints/HARNESS.md"
+  need_file "$VERSION_FILE"
   latest="$(package_version)"
+  latest_n="$(normalize_version "$latest")"
   if [[ -f "$state" ]]; then
     current="$(read_state_field "$state" version unknown)"
   fi
-  emit_info "installed version: ${current}"
-  emit_info "package version:   ${latest}"
-  if [[ "$current" == "$latest" ]]; then
-    emit_info "already up to date"
-    bp_end_success
-    return 0
+  current_n="$(normalize_version "$current")"
+
+  emit_phase_start "Checking versions"
+  emit_info "target version:  v${current_n:-unknown}"
+  emit_info "package version: v${latest_n}"
+  if [[ "$current" == "unknown" || -z "$current_n" ]]; then
+    emit_warning "No installed version in ${STATE_FILE} — will stamp package version after update"
+  elif versions_equal "$current" "$latest"; then
+    emit_info "versions match — refreshing managed blueprint context from package"
+  else
+    printf '  %s!%s  Version mismatch: target v%s → package v%s\n' \
+      "$(term_color red)$(term_color bold)" "$(term_color reset)" \
+      "$current_n" "$latest_n" >&2
+    if [[ -t 0 && -t 1 && "${CI:-}" != "1" && "$DRY_RUN" -eq 0 ]]; then
+      if ! term_prompt_read '  Update all managed blueprint context on this target? [Y/n] (Esc cancel): '; then
+        emit_info "update cancelled"
+        emit_phase_complete "Checking versions"
+        bp_end_success
+        return 0
+      fi
+      local ans="${BP_READ_RESULT:-}"
+      case "$ans" in
+        ""|y|Y|yes|YES) ;;
+        *)
+          emit_info "update cancelled"
+          emit_phase_complete "Checking versions"
+          bp_end_success
+          return 0
+          ;;
+      esac
+    fi
   fi
-  emit_info "update plan:"
-  emit_info "  1. re-run: ./blueprint sync --dry-run"
-  emit_info "  2. review conflicts (*.blueprint-conflict)"
-  emit_info "  3. apply:  ./blueprint sync"
-  emit_info "  4. verify: ./blueprint doctor"
+  emit_phase_complete "Checking versions"
+
+  # Capture agent instruction bytes for preservation guarantees.
+  local agents_before="" agents_lower_before="" claude_before=""
+  local agents_path="" agents_lower_path="" claude_path=""
+  if harness_exact_exists "$dest_root" "AGENTS.md"; then
+    agents_path="$(harness_exact_path "$dest_root" "AGENTS.md")"
+    agents_before="$(cat "$agents_path")"
+  fi
+  if harness_exact_exists "$dest_root" "agents.md"; then
+    agents_lower_path="$(harness_exact_path "$dest_root" "agents.md")"
+    if [[ "$agents_lower_path" != "$agents_path" ]]; then
+      agents_lower_before="$(cat "$agents_lower_path")"
+    fi
+  fi
+  if harness_exact_exists "$dest_root" "CLAUDE.md"; then
+    claude_path="$(harness_exact_path "$dest_root" "CLAUDE.md")"
+    claude_before="$(cat "$claude_path")"
+  fi
+
+  # Prefer consumer state source (may fetch remote cache) like sync/install.
+  if [[ -f "$state" ]]; then
+    bp_resolve_source_for_op
+  else
+    PACKAGE_ROOT="$ROOT"
+    refresh_package_paths
+  fi
+
+  local bp="default"
+  local runtimes=""
+  local updated_runtimes=0
+  if [[ -f "$state" ]]; then
+    bp="$(read_state_field "$state" blueprint default)"
+    local ov
+    ov="$(read_state_field "$state" overlay "")"
+    if [[ -n "$ov" && "$ov" != "null" ]]; then
+      OVERLAY="$ov"
+    fi
+    runtimes="$(read_state_runtimes "$state")"
+  fi
+  BLUEPRINT="$bp"
+
+  session_start "$dest_root" "update" "${BP_CTX_SOURCE:-$(package_source_ref)}"
+
+  emit_phase_start "Updating HARNESS.md"
+  progress_bar_begin 2
+  # Never call ensure_harness_reference — agent instruction files stay user-owned.
+  if ! update_harness_only "$dest_root" "$latest"; then
+    emit_phase_complete "Updating HARNESS.md"
+    bp_end_failure
+    exit 1
+  fi
+  emit_phase_complete "Updating HARNESS.md"
+
+  if [[ -n "$runtimes" ]]; then
+    emit_phase_start "Updating managed runtime context"
+    emit_info "refreshing blueprint=$bp runtimes=$runtimes (preserve agent files)"
+    progress_bar_begin "$(estimate_managed_copy_total "$runtimes")"
+    local bp_dir
+    bp_dir="$(resolve_blueprint_dir "$bp")"
+    need_file "${bp_dir}/blueprint.yaml"
+    need_file "$MANIFEST"
+    apply_managed_runtime_projections "$dest_root" "$bp" "$runtimes"
+    updated_runtimes=1
+    emit_phase_complete "Updating managed runtime context"
+  else
+    emit_info "no runtimes in state — skipped .cursor/.claude refresh (run install first)"
+  fi
+
+  # Stamp package version into state + targets registry.
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    if [[ -f "$state" ]]; then
+      if [[ -n "$runtimes" ]]; then
+        write_state "$dest_root" "$bp" "$runtimes"
+      else
+        # Preserve empty runtimes; still bump version fields.
+        write_state "$dest_root" "$bp" ""
+      fi
+    else
+      write_state "$dest_root" "default" ""
+    fi
+    targets_upsert "$dest_root" "$latest" || true
+  fi
+
+  # Verify agent instruction files were not modified.
+  if [[ -n "$agents_path" && "$(cat "$agents_path")" != "$agents_before" ]]; then
+    emit_error "update unexpectedly modified AGENTS.md"
+    bp_end_failure
+    exit 1
+  fi
+  if [[ -n "$agents_lower_path" && "$agents_lower_path" != "$agents_path" && "$(cat "$agents_lower_path")" != "$agents_lower_before" ]]; then
+    emit_error "update unexpectedly modified agents.md"
+    bp_end_failure
+    exit 1
+  fi
+  if [[ -n "$claude_path" && "$(cat "$claude_path")" != "$claude_before" ]]; then
+    emit_error "update unexpectedly modified CLAUDE.md"
+    bp_end_failure
+    exit 1
+  fi
+
+  print_update_harness_summary "$dest_root" "$current_n" "$latest_n" "$updated_runtimes"
   bp_end_success
 }
 
@@ -884,33 +1210,148 @@ cmd_sync() {
 
   session_start "$dest_root" "sync" "${BP_CTX_SOURCE:-}"
   emit_phase_start "Copying files"
-  install_compat_docs "$dest_root"
+  progress_bar_begin "$(estimate_managed_copy_total "$runtimes")"
   install_memory_templates_if_absent "$dest_root"
-  install_gitignore "$dest_root"
-
-  local rt
-  for rt in $runtimes; do
-    install_runtime "$dest_root" "$rt"
-    local rt_root
-    rt_root="$(runtime_root_name "$rt")"
-    local rt_templates="${dest_root}/${rt_root}/templates"
-    mkdir -p "$rt_templates"
-    copy_file "${PACKAGE_ROOT}/templates/review-checklist.md" "${rt_templates}/review-checklist.md"
-    copy_file "${PACKAGE_ROOT}/templates/adr.md" "${rt_templates}/adr.md"
-    case "$BLUEPRINT" in
-      engineering)
-        copy_file "${PACKAGE_ROOT}/harness/commands/commit.md" "${dest_root}/${rt_root}/commands/commit.md"
-        ;;
-      startup)
-        copy_file "${PACKAGE_ROOT}/templates/prd.md" "${rt_templates}/prd.md"
-        ;;
-    esac
-    if [[ "$OVERLAY" == "gitlab" ]]; then
-      install_gitlab_overlay_into "${dest_root}/${rt_root}/commands"
-    fi
-  done
+  apply_managed_runtime_projections "$dest_root" "$BLUEPRINT" "$runtimes"
   write_state "$dest_root" "$BLUEPRINT" "$runtimes"
   emit_phase_complete "Copying files"
+  bp_end_success
+}
+
+cmd_del() {
+  bp_begin "Del" 1
+  local dest_root="$TARGET"
+  local abs_dest abs_root
+  abs_dest="$(cd "$dest_root" 2>/dev/null && pwd || echo "$dest_root")"
+  abs_root="$(cd "$ROOT" 2>/dev/null && pwd || echo "$ROOT")"
+
+  if [[ "$abs_dest" == "$abs_root" ]]; then
+    emit_error "refusing to remove blueprint from the package source itself"
+    bp_end_failure
+    exit 1
+  fi
+
+  PACKAGE_ROOT="$ROOT"
+  refresh_package_paths
+
+  local state="${dest_root}/${STATE_FILE}"
+  local memory_files=(
+    PLANNING.md
+    DECISIONS.md
+    RUN_LOG.md
+    HOTCACHE.md
+    LEARNING.md
+    ANTI-PATTERNS.md
+  )
+  local has_anything=0
+  if [[ -f "$state" || -f "${dest_root}/HARNESS.md" || -d "${dest_root}/.cursor" || -d "${dest_root}/.claude" || -d "${dest_root}/.agent-blueprint" ]]; then
+    has_anything=1
+  fi
+  local mf
+  for mf in "${memory_files[@]}"; do
+    if [[ -f "${dest_root}/${mf}" ]]; then
+      has_anything=1
+      break
+    fi
+  done
+  if [[ -f "${dest_root}/.gitignore" ]] && grep -qF "# --- shared-agent-blueprints (managed) ---" "${dest_root}/.gitignore" 2>/dev/null; then
+    has_anything=1
+  fi
+  if harness_exact_exists "$dest_root" "AGENTS.md" || harness_exact_exists "$dest_root" "agents.md"; then
+    local probe=""
+    if harness_exact_exists "$dest_root" "AGENTS.md"; then
+      probe="$(harness_exact_path "$dest_root" "AGENTS.md")"
+    else
+      probe="$(harness_exact_path "$dest_root" "agents.md")"
+    fi
+    if grep -qF "$HARNESS_REF_START" "$probe" 2>/dev/null; then
+      has_anything=1
+    fi
+  fi
+
+  if [[ "$has_anything" -eq 0 ]]; then
+    emit_info "no blueprint install found at $dest_root"
+    bp_end_success
+    return 0
+  fi
+
+  emit_phase_start "Confirm removal"
+  emit_info "target: $dest_root"
+  emit_info "will remove: HARNESS.md (if managed), memory files (PLANNING/DECISIONS/RUN_LOG/HOTCACHE/LEARNING/ANTI-PATTERNS), .cursor/, .claude/, .agent-blueprint.yaml, .agent-blueprint/, managed .gitignore section, harness reference block"
+  emit_info "will preserve: AGENTS.md / agents.md / CLAUDE.md body, local overrides"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    emit_info "dry-run: skipping confirmation"
+  elif [[ -t 0 && -t 1 && "${CI:-}" != "1" ]]; then
+    if ! term_prompt_read "  Type del to confirm removal (Esc cancel): "; then
+      emit_info "del cancelled"
+      emit_phase_complete "Confirm removal"
+      bp_end_success
+      return 0
+    fi
+    local ans="${BP_READ_RESULT:-}"
+    if [[ "$ans" != "del" ]]; then
+      emit_info "del cancelled"
+      emit_phase_complete "Confirm removal"
+      bp_end_success
+      return 0
+    fi
+  elif [[ "$FORCE" -ne 1 ]]; then
+    emit_error "del requires confirmation; re-run with --force for non-interactive removal"
+    emit_phase_complete "Confirm removal"
+    bp_end_failure
+    exit 1
+  fi
+  emit_phase_complete "Confirm removal"
+
+  session_start "$dest_root" "del" "$(package_source_ref)"
+  emit_phase_start "Removing blueprint"
+  progress_bar_begin 18
+
+  # Managed harness file only.
+  if [[ -f "${dest_root}/HARNESS.md" ]]; then
+    if harness_is_managed_file "${dest_root}/HARNESS.md"; then
+      del_remove_path "${dest_root}/HARNESS.md"
+    else
+      emit_file_skipped "${dest_root}/HARNESS.md" "unmanaged"
+    fi
+  fi
+
+  # Strip managed reference; never delete agent instruction files.
+  if harness_exact_exists "$dest_root" "AGENTS.md"; then
+    remove_harness_reference "$(harness_exact_path "$dest_root" "AGENTS.md")" || true
+  fi
+  if harness_exact_exists "$dest_root" "agents.md"; then
+    local agents_p lower_p
+    agents_p="$(harness_exact_path "$dest_root" "AGENTS.md" 2>/dev/null || true)"
+    lower_p="$(harness_exact_path "$dest_root" "agents.md")"
+    if [[ -z "$agents_p" || "$lower_p" != "$agents_p" ]]; then
+      remove_harness_reference "$lower_p" || true
+    fi
+  fi
+
+  remove_gitignore_managed_section "$dest_root"
+
+  # Task memory skeletons from init /install.
+  for mf in "${memory_files[@]}"; do
+    del_remove_path "${dest_root}/${mf}"
+  done
+
+  # Runtime projections (fully managed / typically gitignored).
+  del_remove_path "${dest_root}/.cursor"
+  del_remove_path "${dest_root}/.claude"
+
+  # Install state + session resume dir.
+  del_remove_path "${dest_root}/${STATE_FILE}"
+  del_remove_path "${dest_root}/.agent-blueprint"
+
+  # Drop from known-targets registry (best-effort).
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    targets_remove "$abs_dest" 2>/dev/null || targets_remove "$dest_root" 2>/dev/null || true
+  fi
+
+  emit_phase_complete "Removing blueprint"
+  emit_info "blueprint removed from target (agent instruction bodies and local overrides preserved)"
   bp_end_success
 }
 
@@ -942,6 +1383,12 @@ cmd_doctor() {
   ui_kv "target" "$abs_dest"
 
   ui_section "Package"
+  if [[ -f "${ROOT}/VERSION" ]]; then
+    ui_ok "VERSION ($(package_version))"
+  else
+    ui_fail "missing VERSION (single source of package semver)"
+    errors=$((errors + 1))
+  fi
   for d in blueprints/default harness/commands harness/rules harness/skills templates/memory templates/entrypoints prompts/system; do
     if [[ ! -e "${ROOT}/$d" ]]; then
       ui_fail "missing $d"
@@ -974,23 +1421,31 @@ cmd_doctor() {
       fi
     done
     ui_section "Entrypoints"
-    for f in AGENTS.md CLAUDE.md; do
-      if [[ -f "${dest_root}/$f" ]]; then
+    for f in AGENTS.md CLAUDE.md templates/entrypoints/HARNESS.md; do
+      if [[ -e "${dest_root}/$f" ]]; then
         ui_ok "$f"
       else
         ui_fail "missing $f"
         errors=$((errors + 1))
       fi
     done
+    if [[ -f "${ROOT}/lib/blueprint/harness.sh" ]]; then
+      ui_ok "lib/blueprint/harness.sh"
+    else
+      ui_fail "missing lib/blueprint/harness.sh"
+      errors=$((errors + 1))
+    fi
   else
     local state="${dest_root}/${STATE_FILE}"
-    local has_agents=0 has_claude=0 has_state=0
-    [[ -f "${dest_root}/AGENTS.md" ]] && has_agents=1
-    [[ -f "${dest_root}/CLAUDE.md" ]] && has_claude=1
+    local has_agents=0 has_agents_lower=0 has_claude=0 has_harness=0 has_state=0
+    harness_exact_exists "$dest_root" "AGENTS.md" && has_agents=1
+    harness_exact_exists "$dest_root" "agents.md" && has_agents_lower=1
+    harness_exact_exists "$dest_root" "CLAUDE.md" && has_claude=1
+    harness_exact_exists "$dest_root" "HARNESS.md" && has_harness=1
     [[ -f "$state" ]] && has_state=1
 
     ui_section "Consumer install"
-    if [[ "$has_state" -eq 0 && "$has_agents" -eq 0 ]]; then
+    if [[ "$has_state" -eq 0 && "$has_agents" -eq 0 && "$has_agents_lower" -eq 0 ]]; then
       ui_fail "not initialized"
       printf '\n'
       ui_next "menu → 1) init"
@@ -1007,17 +1462,24 @@ cmd_doctor() {
         ui_fail "missing ${STATE_FILE}  (run init, then install)"
         errors=$((errors + 1))
       fi
+      if [[ "$has_harness" -eq 1 ]]; then
+        ui_ok "HARNESS.md"
+      else
+        ui_fail "missing HARNESS.md  (run init or update)"
+        errors=$((errors + 1))
+      fi
       if [[ "$has_agents" -eq 1 ]]; then
         ui_ok "AGENTS.md"
+      elif [[ "$has_agents_lower" -eq 1 ]]; then
+        ui_ok "agents.md"
       else
-        ui_fail "missing AGENTS.md  (run init)"
+        ui_fail "missing AGENTS.md / agents.md  (run init)"
         errors=$((errors + 1))
       fi
       if [[ "$has_claude" -eq 1 ]]; then
-        ui_ok "CLAUDE.md"
+        ui_ok "CLAUDE.md (unchanged by init/update)"
       else
-        ui_fail "missing CLAUDE.md  (run init)"
-        errors=$((errors + 1))
+        ui_skip "CLAUDE.md not present"
       fi
 
       ui_section "Runtimes"
@@ -1087,10 +1549,11 @@ Usage: blueprint [<command>] [blueprint] [flags]
 
 Commands:
   (none) / menu        Interactive menu (TTY)
-  init                 Write AGENTS.md, CLAUDE.md, memory, .gitignore (no tool runtime)
+  init                 Write HARNESS.md + agent harness reference, memory, .gitignore
   install <blueprint>  Install blueprint into --target runtimes
-  update               Show update plan vs package VERSION
+  update               Version check, then refresh HARNESS.md + managed runtimes (preserves agent files)
   sync                 Re-apply installed blueprint with preserve-local
+  del                  Remove blueprint from --target (keyword only in menu; no number)
   doctor               Validate package + target install health
 
 Blueprints:
@@ -1102,7 +1565,7 @@ Flags:
                        (omit to get an interactive selector; both tools optional)
   --target PATH        Consumer project root (any local path; not this package)
   --dry-run            Print actions without writing
-  --force              Overwrite unmanaged files
+  --force              Overwrite unmanaged files; required for non-interactive del
 
 Install on PATH (optional):
   ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
@@ -1113,24 +1576,30 @@ Remote source:
 EOF
 }
 
+# Interactive line prompt. Sets BP_PROMPT_VALUE. Returns 1 on Escape.
 prompt_line() {
   local label="$1"
   local default="${2:-}"
-  local value=""
+  BP_PROMPT_VALUE=""
   if [[ -n "$default" ]]; then
     printf '%s\n  default: %s\n> ' "$label" "$default" >&2
   else
     printf '%s\n> ' "$label" >&2
   fi
-  read -r value || true
+  term_read_line
+  if [[ "${BP_READ_ESC:-0}" -eq 1 ]]; then
+    return 1
+  fi
+  local value="${BP_READ_RESULT:-}"
   value="${value//$'\r'/}"
   value="${value#"${value%%[![:space:]]*}"}"
   value="${value%"${value##*[![:space:]]}"}"
   if [[ -z "$value" ]]; then
-    printf '%s\n' "$default"
+    BP_PROMPT_VALUE="$default"
   else
-    printf '%s\n' "$value"
+    BP_PROMPT_VALUE="$value"
   fi
+  return 0
 }
 
 expand_path() {
@@ -1161,19 +1630,21 @@ Select blueprint:
   1) default       Core harness (start/review, safety, skills)
   2) engineering   + commit / refactor / ADR
   3) startup       + PRD/ADR templates
-  4) cancel
+
+  Esc) back
 
 EOF
   local choice=""
   while true; do
-    printf 'Blueprint [1-4]: '
-    read -r choice || true
+    if ! term_prompt_read 'Blueprint [1-3] (Esc back): '; then
+      return 1
+    fi
+    choice="${BP_READ_RESULT:-}"
     case "$choice" in
       1|default|d) BLUEPRINT="default"; break ;;
       2|engineering|e) BLUEPRINT="engineering"; break ;;
       3|startup|s) BLUEPRINT="startup"; break ;;
-      4|q|cancel|"") return 1 ;;
-      *) warn "invalid choice: $choice (use 1-4)" ;;
+      *) warn "invalid choice: $choice (use 1-3, or Esc)" ;;
     esac
   done
   emit_info "selected blueprint: $BLUEPRINT"
@@ -1186,18 +1657,20 @@ select_overlay() {
 Select forge overlay (optional):
   1) none      No forge overlay
   2) gitlab    GitLab / glab MR playbooks
-  3) cancel
+
+  Esc) back
 
 EOF
   local choice=""
   while true; do
-    printf 'Overlay [1-3]: '
-    read -r choice || true
+    if ! term_prompt_read 'Overlay [1-2] (Esc back): '; then
+      return 1
+    fi
+    choice="${BP_READ_RESULT:-}"
     case "$choice" in
       1|none|n|"") OVERLAY=""; break ;;
       2|gitlab|g) OVERLAY="gitlab"; break ;;
-      3|q|cancel) return 1 ;;
-      *) warn "invalid choice: $choice (use 1-3)" ;;
+      *) warn "invalid choice: $choice (use 1-2, or Esc)" ;;
     esac
   done
   if [[ -n "$OVERLAY" ]]; then
@@ -1225,12 +1698,19 @@ menu_prompt_target_path() {
   Package (do not use as target):
     $(term_home_path "$ROOT")
 
+  Esc) back
+
 EOF
     if [[ -n "$default_hint" ]]; then
-      raw="$(prompt_line "Enter consumer project path (absolute or ~/…)" "$default_hint")"
+      if ! prompt_line "Enter consumer project path (absolute or ~/…)" "$default_hint"; then
+        return 1
+      fi
     else
-      raw="$(prompt_line "Enter consumer project path (absolute or ~/…)" "")"
+      if ! prompt_line "Enter consumer project path (absolute or ~/…)" ""; then
+        return 1
+      fi
     fi
+    raw="${BP_PROMPT_VALUE:-}"
 
     if [[ -z "$raw" ]]; then
       warn "target path is required — use a path outside this blueprint repo"
@@ -1256,17 +1736,19 @@ EOF
 
     printf '\n  Resolved target:\n    %s\n\n' "$resolved" >&2
     if [[ -d "$resolved" ]]; then
-      printf 'Use this existing project? [Y/n]: ' >&2
-      local ok=""
-      read -r ok || true
+      if ! term_prompt_read 'Use this existing project? [Y/n] (Esc back): '; then
+        return 1
+      fi
+      local ok="${BP_READ_RESULT:-}"
       case "$ok" in
         ""|y|Y|yes|YES) ;;
         *) continue ;;
       esac
     else
-      printf 'Path does not exist yet. Create it? [y/N]: ' >&2
-      local create=""
-      read -r create || true
+      if ! term_prompt_read 'Path does not exist yet. Create it? [y/N] (Esc back): '; then
+        return 1
+      fi
+      local create="${BP_READ_RESULT:-}"
       case "$create" in
         y|Y|yes|YES)
           mkdir -p "$resolved" || {
@@ -1292,47 +1774,97 @@ EOF
 menu_prompt_target_pick() {
   local -a t_paths=()
   local -a versions=()
-  local t_path ver
-  while IFS=$'\t' read -r t_path ver || [[ -n "${t_path:-}" ]]; do
-    [[ -n "$t_path" ]] || continue
-    t_paths+=("$t_path")
-    versions+=("${ver:-}")
-  done < <(targets_list)
+  local pkg_ver pkg_n
+  pkg_ver="$(package_version 2>/dev/null || echo "")"
+  pkg_n="${pkg_ver#v}"
 
-  local n="${#t_paths[@]}"
-  if [[ "$n" -eq 0 ]]; then
-    return 1
-  fi
-
-  local add_idx=$((n + 1))
   while true; do
+    t_paths=()
+    versions=()
+    local t_path ver
+    while IFS=$'\t' read -r t_path ver; do
+      [[ -n "$t_path" ]] || continue
+      t_paths+=("$t_path")
+      versions+=("${ver:-}")
+    done < <(targets_list)
+
+    local n="${#t_paths[@]}"
+    if [[ "$n" -eq 0 ]]; then
+      return 1
+    fi
+
     menu_splash "$(pwd)"
-    printf '  Known consumer projects\n\n' >&2
-    local i disp
+
+    local -a table_args=("$pkg_n")
+    local i
     for ((i = 0; i < n; i++)); do
-      disp="$(term_home_path "${t_paths[$i]}")"
-      printf '  %s%d%s) %-40s  v%s\n' \
-        "$(term_color cyan)" "$((i + 1))" "$(term_color reset)" \
-        "$disp" "${versions[$i]:-?}" >&2
+      table_args+=("${t_paths[$i]}" "${versions[$i]:-?}")
     done
-    printf '  %s%d%s) Add new target project\n\n' \
-      "$(term_color cyan)" "$add_idx" "$(term_color reset)" >&2
+    render_targets_table "${table_args[@]}"
+    render_targets_actions 48
 
     local choice=""
-    printf 'Target [1-%d]: ' "$add_idx" >&2
-    read -r choice || true
+    # Esc is disabled on the known-projects screen (avoids menu ↔ picker loops).
+    if ! term_prompt_read "Target [1-${n} | add|rm|q]: "; then
+      continue
+    fi
+    choice="${BP_READ_RESULT:-}"
     choice="${choice#"${choice%%[![:space:]]*}"}"
     choice="${choice%"${choice##*[![:space:]]}"}"
 
-    if [[ "$choice" == "$add_idx" || "$choice" == "n" || "$choice" == "new" || "$choice" == "add" ]]; then
+    if [[ "$choice" == "q" || "$choice" == "quit" || "$choice" == "exit" ]]; then
+      return 2
+    fi
+
+    if [[ "$choice" == "add" || "$choice" == "a" || "$choice" == "n" || "$choice" == "new" ]]; then
       return 1
+    fi
+
+    if [[ "$choice" == "rm" || "$choice" == "r" || "$choice" == "remove" ]]; then
+      local rm_choice=""
+      if ! term_prompt_read "Remove which target [1-${n}] (Esc cancel): "; then
+        continue
+      fi
+      rm_choice="${BP_READ_RESULT:-}"
+      rm_choice="${rm_choice#"${rm_choice%%[![:space:]]*}"}"
+      rm_choice="${rm_choice%"${rm_choice##*[![:space:]]}"}"
+      if [[ -z "$rm_choice" ]]; then
+        continue
+      fi
+      if [[ ! "$rm_choice" =~ ^[0-9]+$ ]] || [[ "$rm_choice" -lt 1 || "$rm_choice" -gt "$n" ]]; then
+        warn "invalid choice: $rm_choice"
+        continue
+      fi
+      local rm_idx=$((rm_choice - 1))
+      local rm_path="${t_paths[$rm_idx]}"
+      local rm_disp
+      rm_disp="$(term_home_path "$rm_path")"
+      printf 'Remove from known list (project files kept)?\n  %s\n' "$rm_disp" >&2
+      local conf=""
+      if ! term_prompt_read '[y/N] (Esc cancel): '; then
+        continue
+      fi
+      conf="${BP_READ_RESULT:-}"
+      case "$conf" in
+        y|Y|yes|YES)
+          if targets_remove "$rm_path"; then
+            emit_info "removed from known targets: $rm_disp"
+          else
+            warn "could not remove: $rm_disp"
+          fi
+          ;;
+        *)
+          emit_info "remove cancelled"
+          ;;
+      esac
+      continue
     fi
 
     if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 && "$choice" -le "$n" ]]; then
       local idx=$((choice - 1))
       local selected="${t_paths[$idx]}"
       if [[ ! -d "$selected" ]]; then
-        warn "path no longer exists: $selected — pick another or add new"
+        warn "path no longer exists: $selected — pick another, remove it, or add"
         continue
       fi
       if paths_equal "$selected" "$ROOT"; then
@@ -1345,12 +1877,17 @@ menu_prompt_target_pick() {
       return 0
     fi
 
-    warn "invalid choice: $choice (use 1-$add_idx)"
+    warn "invalid choice: $choice (use 1-$n, add, rm, or q)"
   done
 }
 
+# mode: required (startup) | change (from command menu)
 menu_prompt_target() {
-  local _required="${1:-0}"
+  local mode="${1:-required}"
+  case "$mode" in
+    1|required) mode="required" ;;
+    change|0) mode="change" ;;
+  esac
   local default_hint="$TARGET"
 
   if [[ -z "$default_hint" || "$default_hint" == "." ]] || paths_equal "$default_hint" "$ROOT"; then
@@ -1361,12 +1898,35 @@ menu_prompt_target() {
   targets_bootstrap_from_history || true
 
   if [[ "$(targets_count)" -gt 0 ]]; then
-    if menu_prompt_target_pick; then
-      return 0
-    fi
+    while true; do
+      menu_prompt_target_pick
+      local pick_rc=$?
+      if [[ "$pick_rc" -eq 0 ]]; then
+        return 0
+      fi
+      if [[ "$pick_rc" -eq 2 ]]; then
+        # q on known projects always exits the CLI (never bounce back to menu).
+        term_reset_clear_flag
+        term_smart_clear
+        printf '  %sbye%s\n' "$(term_color dim)" "$(term_color reset)" >&2
+        exit 0
+      fi
+      # pick_rc == 1 → add new target
+      if menu_prompt_target_path "$default_hint"; then
+        return 0
+      fi
+      # Esc on path entry → back to picker
+    done
   fi
 
-  menu_prompt_target_path "$default_hint"
+  if menu_prompt_target_path "$default_hint"; then
+    return 0
+  fi
+  if [[ "$mode" == "change" ]]; then
+    return 1
+  fi
+  printf '\n  Quit.\n' >&2
+  exit 0
 }
 
 menu_run() {
@@ -1384,8 +1944,25 @@ menu_run() {
   else
     printf '  %s✓%s  Action complete\n' "$(term_color green)$(term_color bold)" "$(term_color reset)"
   fi
-  printf '\n  %sPress Enter to return to menu…%s ' "$(term_color dim)" "$(term_color reset)"
-  read -r _ || true
+  printf '\n  %sPress Enter (or Esc) to return to menu…%s ' "$(term_color dim)" "$(term_color reset)"
+  term_read_line || true
+}
+
+# Nested install selectors: Esc walks back one step.
+menu_install_wizard() {
+  while true; do
+    select_blueprint || return 1
+    while true; do
+      select_overlay || break
+      RUNTIME_SET=0
+      RUNTIME=""
+      while true; do
+        select_runtime || break
+        RUNTIME_SET=1
+        return 0
+      done
+    done
+  done
 }
 
 menu_draw() {
@@ -1411,23 +1988,26 @@ cmd_menu() {
   fi
 
   # Target prompt clears and shows banner as the first CLI frame.
-  menu_prompt_target 1
+  menu_prompt_target required
 
   while true; do
     menu_draw
     local choice=""
-    read -r choice || true
+    if ! term_prompt_read ''; then
+      # Esc from command menu → target picker
+      menu_splash "$(pwd)"
+      menu_prompt_target change || true
+      continue
+    fi
+    choice="${BP_READ_RESULT:-}"
     case "$choice" in
       1|init)
         menu_run cmd_init
         ;;
       2|install)
-        select_blueprint || continue
-        select_overlay || continue
-        RUNTIME_SET=0
-        RUNTIME=""
-        select_runtime || continue
-        RUNTIME_SET=1
+        if ! menu_install_wizard; then
+          continue
+        fi
         menu_run cmd_install
         ;;
       3|sync)
@@ -1441,28 +2021,31 @@ cmd_menu() {
         ;;
       6|target|set)
         menu_splash "$(pwd)"
-        menu_prompt_target 1
+        menu_prompt_target change || true
         ;;
-      7|help|h)
+      h|help)
         term_reset_clear_flag
         term_smart_clear
         render_banner "$(package_version)" "help" "$(term_home_path "$TARGET")"
         usage
-        printf '\n  %sPress Enter to return to menu…%s ' "$(term_color dim)" "$(term_color reset)"
-        read -r _ || true
+        printf '\n  %sPress Enter (or Esc) to return to menu…%s ' "$(term_color dim)" "$(term_color reset)"
+        term_read_line || true
         ;;
-      8|back|b)
-        menu_splash "$(pwd)"
-        menu_prompt_target 1
+      del)
+        # Keyword only — never bind a menu number to destructive removal.
+        menu_run cmd_del
         ;;
-      0|q|quit|exit|"")
+      q|quit|exit)
         term_reset_clear_flag
         term_smart_clear
         printf '  %sbye%s\n' "$(term_color dim)" "$(term_color reset)"
         return 0
         ;;
+      "")
+        # Empty Enter re-prompts; use q to quit.
+        ;;
       *)
-        warn "invalid choice: $choice (use 0-8)"
+        warn "invalid choice: $choice (use 1-6, h, q, del, or Esc)"
         sleep 0.6 2>/dev/null || true
         ;;
     esac
@@ -1475,6 +2058,7 @@ case "$cmd" in
   install) cmd_install ;;
   update) cmd_update ;;
   sync) cmd_sync ;;
+  del) cmd_del ;;
   doctor) cmd_doctor ;;
   -h|--help|help) usage ;;
   "")

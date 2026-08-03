@@ -16,16 +16,17 @@ Consumers use the CLI (never copy package-root docs as the product contract):
 ./blueprint doctor --target /path/to/repo
 ```
 
-`init` writes the consumer `AGENTS.md` / `CLAUDE.md` from `templates/entrypoints/` plus memory skeletons. `install` projects `harness/` into `.cursor/` and/or `.claude/` per `--runtime`.
+`init` writes consumer `HARNESS.md`, injects a managed harness reference into `AGENTS.md` or existing `agents.md`, and seeds memory skeletons. `install` projects `harness/` into `.cursor/` and/or `.claude/` per `--runtime`. `update` refreshes only `HARNESS.md`.
 
 See [README.md](README.md) and [docs/](docs/).
 
 ## Package edit order
 
 1. This file / [CLAUDE.md](CLAUDE.md) for package orientation
-2. `harness/` skills, rules, commands relevant to the change
-3. `templates/entrypoints/` when changing the consumer contract
-4. `docs/` for adoption and compatibility notes
+2. `VERSION` for package semver (**only** place to bump the release number)
+3. `harness/` skills, rules, commands relevant to the change
+4. `templates/entrypoints/` when changing the consumer contract
+5. `docs/` for adoption and compatibility notes
 
 ## Don't
 

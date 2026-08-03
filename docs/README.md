@@ -10,6 +10,7 @@ Narrative docs for this shared agent blueprint package. Start from the root [REA
 |---|---|
 | [architecture.md](architecture.md) | Package vs consumer, multi-runtime projection (mermaid) |
 | [compatibility.md](compatibility.md) | Package sources vs consumer-only artifacts |
+| [harness-ownership.md](harness-ownership.md) | `HARNESS.md` vs agent files; init/update ownership |
 
 ### Setup
 
@@ -43,7 +44,8 @@ Narrative docs for this shared agent blueprint package. Start from the root [REA
 ./blueprint init --target /path/to/repo
 ./blueprint install default --runtime all --target /path/to/repo
 ./blueprint install engineering --overlay gitlab --runtime all --target /path/to/repo
+./blueprint update --target /path/to/repo
 ./blueprint sync --target /path/to/repo
 ```
 
-Smoke tests: `./tests/cli/smoke.sh`
+Smoke tests: `./tests/cli/smoke.sh` · harness ownership tests: `./tests/cli/harness.sh`

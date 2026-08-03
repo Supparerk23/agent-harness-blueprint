@@ -34,7 +34,7 @@ flowchart LR
 | Layer | Lives in package | Lands in consumer |
 |---|---|---|
 | Commands / rules / skills | `harness/` | `.cursor/` and/or `.claude/` |
-| Shared AI contract | `templates/entrypoints/` | `AGENTS.md`, `CLAUDE.md` |
+| Shared AI contract | `templates/entrypoints/` | `HARNESS.md`, `AGENTS.md` (+ optional user `CLAUDE.md`) |
 | Memory skeletons | `templates/memory/` | `PLANNING.md`, … (once; never overwritten) |
 | Profiles | `blueprints/` | Selected extras + overlays |
 

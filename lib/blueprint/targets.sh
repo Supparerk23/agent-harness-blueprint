@@ -129,6 +129,77 @@ targets_upsert() {
   /bin/mv "$tmp" "$file" 2>/dev/null || /bin/rm -f "$tmp"
 }
 
+# Remove a consumer path from the known-targets registry (does not delete project files).
+# Match the path exactly as stored in targets.json (same string shown in the TUI list).
+targets_remove() {
+  local abs_path="$1"
+  if [[ -z "$abs_path" ]]; then
+    return 0
+  fi
+
+  local file
+  file="$(targets_file)"
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+
+  local found=0
+  local keep_file
+  keep_file="$(mktemp 2>/dev/null || echo "${file}.keep")"
+  : > "$keep_file"
+
+  local t_path ver
+  while IFS=$'\t' read -r t_path ver; do
+    [[ -n "$t_path" ]] || continue
+    if [[ "$t_path" == "$abs_path" ]]; then
+      found=1
+      continue
+    fi
+    printf '%s\t%s\n' "$t_path" "${ver:-}" >> "$keep_file"
+  done < <(targets_list)
+
+  if [[ "$found" -eq 0 ]]; then
+    /bin/rm -f "$keep_file"
+    return 1
+  fi
+
+  local tmp updated_at
+  updated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  tmp="$(mktemp 2>/dev/null || echo "${file}.tmp")"
+  if [[ ! -s "$keep_file" ]]; then
+    printf '[]\n' > "$tmp" || {
+      /bin/rm -f "$keep_file" "$tmp"
+      return 1
+    }
+  else
+    {
+      printf '[\n'
+      local count=0
+      while IFS=$'\t' read -r t_path ver; do
+        [[ -n "$t_path" ]] || continue
+        if [[ "$count" -gt 0 ]]; then
+          printf ',\n'
+        fi
+        printf '  {"path":"%s","version":"%s","updatedAt":"%s"}' \
+          "$(history_json_escape "$t_path")" \
+          "$(history_json_escape "${ver:-}")" \
+          "$(history_json_escape "$updated_at")"
+        count=$((count + 1))
+      done < "$keep_file"
+      printf '\n]\n'
+    } > "$tmp" || {
+      /bin/rm -f "$keep_file" "$tmp"
+      return 1
+    }
+  fi
+  /bin/rm -f "$keep_file"
+  /bin/mv "$tmp" "$file" 2>/dev/null || {
+    /bin/rm -f "$tmp"
+    return 1
+  }
+  return 0
+}
+
 # Remember a locked/inited consumer (version from state or package).
 targets_remember() {
   local abs_path="$1"

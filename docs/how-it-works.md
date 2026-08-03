@@ -6,7 +6,8 @@ Runtime behavior after a project has been initialized and installed.
 
 ```mermaid
 flowchart TD
-  A[AGENTS.md] --> B{Local overrides?}
+  H[HARNESS.md] --> A[AGENTS.md / agents.md]
+  A --> B{Local overrides?}
   B -->|yes| L[AGENTS.local.md / CLAUDE.local.md]
   B -->|no| R[Rules under active runtime]
   L --> R
@@ -14,7 +15,7 @@ flowchart TD
   S --> M[Memory files if executing planned work]
 ```
 
-Claude Code also loads root `CLAUDE.md`, which points at `AGENTS.md` first.
+Claude Code also loads root `CLAUDE.md`, which points at `AGENTS.md` first. `blueprint update` version-checks then refreshes managed blueprint context (`HARNESS.md` + runtimes); see [harness-ownership.md](harness-ownership.md).
 
 ## Layers
 
