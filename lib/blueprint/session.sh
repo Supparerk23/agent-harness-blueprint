@@ -170,10 +170,15 @@ session_prompt_resume() {
 
   session_view_summary "$dest"
   printf '\n[R] Resume\n[N] Start new run\n[V] View summary\n'
+  printf 'Esc) back (start new)\n'
   local choice=""
   while true; do
-    printf 'Choice [R/N/V]: '
-    read -r choice || true
+    if ! term_prompt_read 'Choice [R/N/V] (Esc back): '; then
+      session_archive "$dest"
+      BP_SESSION_RESUME=0
+      return 0
+    fi
+    choice="${BP_READ_RESULT:-}"
     case "$choice" in
       R|r|resume)
         BP_SESSION_RESUME=1
@@ -189,7 +194,7 @@ session_prompt_resume() {
         session_view_summary "$dest"
         ;;
       *)
-        warn "invalid choice: $choice (use R, N, or V)"
+        warn "invalid choice: $choice (use R, N, V, or Esc)"
         ;;
     esac
   done

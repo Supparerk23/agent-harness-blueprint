@@ -33,7 +33,7 @@ On a TTY, run with no command (or `menu`) for a guided UI:
 ./blueprint menu --target /path/to/your-repo
 ```
 
-Menu flow: set **target** first (any local path outside this package), then choose `init` / `install` (blueprint → overlay → runtime) / `sync` / `update` / `doctor`.
+Menu flow: set **target** first (any local path outside this package), then choose `init` / `install` (blueprint → overlay → runtime) / `sync` / `update` / `doctor`. Type `del` (keyword only — no number) to remove the blueprint from the target. Press **Esc** on any selection screen to return to the previous state (from the command menu, Esc returns to the target picker).
 
 Each mutating action clears the visible terminal once, renders a compact header, streams file events, and prints a summary. CI / non-TTY skips clear and animation.
 
@@ -52,17 +52,27 @@ blueprint install default --runtime all --target /path/to/your-repo
 # Optional engineering + GitLab MR playbooks
 blueprint install engineering --overlay gitlab --runtime all --target /path/to/your-repo
 
-# Later: refresh managed files without clobbering local memory
+# Later: refresh managed HARNESS.md + runtimes
+blueprint update --target /path/to/your-repo
+
+# Later: refresh runtime projections without clobbering local memory / agent files
 blueprint sync --target /path/to/your-repo
+
+# Remove blueprint from a target (interactive: type del to confirm; CI: --force)
+blueprint del --target /path/to/your-repo
 ```
+
+File ownership for `HARNESS.md` vs agent instruction files: **[docs/harness-ownership.md](harness-ownership.md)**.
 
 ## What each step writes
 
 | Step | Writes | Does not write |
 |---|---|---|
-| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons, managed `.gitignore` section, `.agent-blueprint.yaml`, local override stub | `.cursor/`, `.claude/` |
-| `install` | Selected blueprint into `--runtime` roots; refresh managed entrypoints | Existing memory file **content** |
-| `sync` | Re-applies installed blueprint + runtimes (`preserve-local`); may fetch remote `source` into `$XDG_CACHE_HOME/blueprint/repos/` | Unmanaged / local overrides |
+| `init` | `HARNESS.md`, agents harness reference (`AGENTS.md` or existing `agents.md`), memory skeletons, managed `.gitignore` section, `.agent-blueprint.yaml`, local override stub | `.cursor/`, `.claude/`; existing `CLAUDE.md` |
+| `install` | Selected blueprint into `--runtime` roots; preserves agent instruction files | Existing memory file **content**; `AGENTS.md` / `agents.md` / `CLAUDE.md` |
+| `update` | Version check (target vs package `VERSION`); refresh `HARNESS.md` + managed runtime projections + state version | Agent instruction files (`AGENTS.md` / `agents.md` / `CLAUDE.md`) |
+| `sync` | Re-applies installed blueprint + runtimes (`preserve-local`); may fetch remote `source` into `$XDG_CACHE_HOME/blueprint/repos/` | Unmanaged / local overrides; agent instruction files |
+| `del` | Removes managed harness/runtimes/state/gitignore section, memory files, and harness reference block | `AGENTS.md` / `agents.md` / `CLAUDE.md` bodies; local overrides |
 
 `--runtime`: `cursor` | `claude` | `all`. If omitted, `install` shows an interactive selector (Cursor and Claude are both optional). Non-interactive shells auto-pick from PATH or require `--runtime`.
 
@@ -72,7 +82,7 @@ When `.agent-blueprint.yaml` `source` is a git URL (`https://…`, `git@…`, `f
 
 Credentials are never printed; interrupted runs store resume state under `.agent-blueprint/` in the consumer (gitignored).
 
-Interactive `./blueprint` remembers consumer targets in package-local `targets.json` (path + blueprint version, updated on `init` / state writes). That file is gitignored and must not be committed. When it has entries, the first menu step offers a picker plus “Add new target project”; when empty, it prompts for a path as before.
+Interactive `./blueprint` remembers consumer targets in package-local `targets.json` (path + blueprint version, updated on `init` / state writes). That file is gitignored and must not be committed. When it has entries, the first menu step offers a picker plus “Add new target project”, “Remove a target”, and `0` Quit; when empty, it prompts for a path as before.
 
 ## Blueprints
 
@@ -97,4 +107,4 @@ flowchart TB
 - [ ] `blueprint doctor --target <repo>`
 - [ ] Start product work with `/start`
 
-Smoke tests: `./tests/cli/smoke.sh`
+Smoke tests: `./tests/cli/smoke.sh` · harness tests: `./tests/cli/harness.sh`

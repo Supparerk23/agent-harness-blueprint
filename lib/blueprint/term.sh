@@ -149,6 +149,25 @@ term_truncate() {
   printf '%s...' "${s:0:$((max - 3))}"
 }
 
+# Left- or right-pad plain text to width (truncate first if needed).
+# Args: text width [left|right]
+term_pad() {
+  local s="$1"
+  local width="$2"
+  local align="${3:-left}"
+  s="$(term_truncate "$s" "$width")"
+  local len=${#s}
+  local pad=$((width - len))
+  if [[ "$pad" -lt 0 ]]; then pad=0; fi
+  local spaces
+  spaces="$(term_repeat ' ' "$pad")"
+  if [[ "$align" == "right" ]]; then
+    printf '%s%s' "$spaces" "$s"
+  else
+    printf '%s%s' "$s" "$spaces"
+  fi
+}
+
 term_home_path() {
   local p="$1"
   if [[ -n "${HOME:-}" && "$p" == "$HOME"* ]]; then
@@ -166,6 +185,86 @@ term_redact_url() {
 
 term_interactive() {
   [[ "$BP_IS_TTY" -eq 1 && -t 0 && "$BP_IS_CI" -eq 0 ]]
+}
+
+# Read one line with live echo; detect bare Escape as "back".
+# Sets BP_READ_RESULT and BP_READ_ESC (0|1). Non-TTY falls back to read -r.
+term_read_line() {
+  BP_READ_RESULT=""
+  BP_READ_ESC=0
+
+  if [[ ! -t 0 ]]; then
+    local line=""
+    IFS= read -r line || true
+    BP_READ_RESULT="$line"
+    return 0
+  fi
+
+  local buf="" c
+  local old_stty=""
+  old_stty="$(stty -g 2>/dev/null || true)"
+  stty -echo 2>/dev/null || true
+  stty -icanon min 1 time 0 2>/dev/null || true
+
+  while true; do
+    c=""
+    IFS= read -r -n 1 c || {
+      [[ -n "$old_stty" ]] && stty "$old_stty" 2>/dev/null || true
+      BP_READ_RESULT="$buf"
+      return 0
+    }
+
+    # Enter (delimiter consumed → empty c) or explicit CR/LF
+    if [[ -z "$c" || "$c" == $'\n' || "$c" == $'\r' ]]; then
+      [[ -n "$old_stty" ]] && stty "$old_stty" 2>/dev/null || true
+      printf '\n' >&2
+      BP_READ_RESULT="$buf"
+      return 0
+    fi
+
+    case "$c" in
+      $'\033')
+        local next=""
+        if IFS= read -r -n 1 -t 0.1 next 2>/dev/null; then
+          # Multi-byte escape sequence (arrows, etc.) — ignore
+          local dump=""
+          IFS= read -r -n 8 -t 0.1 dump 2>/dev/null || true
+          continue
+        fi
+        [[ -n "$old_stty" ]] && stty "$old_stty" 2>/dev/null || true
+        printf '\n' >&2
+        BP_READ_ESC=1
+        BP_READ_RESULT=""
+        return 0
+        ;;
+      $'\x7f'|$'\b')
+        if [[ -n "$buf" ]]; then
+          buf="${buf:0:$((${#buf} - 1))}"
+          printf '\b \b' >&2
+        fi
+        ;;
+      *)
+        # Ignore other control chars
+        if [[ "$c" < ' ' ]]; then
+          continue
+        fi
+        buf+="$c"
+        printf '%s' "$c" >&2
+        ;;
+    esac
+  done
+}
+
+# Print prompt on stderr, then term_read_line.
+# Returns 0 with BP_READ_RESULT set, or 1 if Escape was pressed.
+term_prompt_read() {
+  local prompt="$1"
+  printf '%s' "$prompt" >&2
+  term_read_line
+  if [[ "${BP_READ_ESC:-0}" -eq 1 ]]; then
+    return 1
+  fi
+  return 0
 }
 
 # Preferred panel width: compact on wide terminals, full width when narrow.

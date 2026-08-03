@@ -83,9 +83,11 @@ ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
 
 | Step | Result |
 |---|---|
-| `init` | `AGENTS.md`, `CLAUDE.md`, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
+| `init` | `HARNESS.md`, agent harness reference, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
 | `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` (prompts for runtime if `--runtime` omitted) |
+| `update` | Version check vs package `VERSION`, then refresh `HARNESS.md` + managed runtime projections — never rewrites agent instruction files |
 | `sync` | Re-applies the installed blueprint (`preserve-local`); fetches a remote `source` URL into a local cache when needed |
+| `del` | Removes managed blueprint + memory files from the target (keyword-only in the menu); preserves agent instruction bodies |
 | `--runtime` | `cursor` \| `claude` \| `all` — both tools optional; omit for interactive selector |
 
 The CLI clears the terminal once per operation (TTY), shows a compact header (project / branch / source / run ID), streams file events with status symbols, and writes a short summary. Interrupted runs can be resumed on the next `install` / `sync`. History is stored locally under `$XDG_DATA_HOME/blueprint/history.jsonl` (no secrets).

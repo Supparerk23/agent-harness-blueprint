@@ -42,7 +42,7 @@ Templates from two skills recreate **six** Markdown trackers at the **adopting**
 | Optional stable layer | Add `ARCHITECTURE.md` when you maintain system design; **`/start` must not reset it** (see [harness/skills/memory-system-protocol/templates.md](../harness/skills/memory-system-protocol/templates.md) **Do not reset**). | **up to 7** |
 | During **delivery batches** | Same files updated in place (checkboxes in `PLANNING`, rows in `DECISIONS`/`RUN_LOG`, scratch edits in `HOTCACHE`). | — |
 
-## Bundled skills (five folders under `harness/skills/`)
+## Bundled skills (under `harness/skills/`)
 
 | Folder | Typical trigger |
 | --- | --- |
@@ -51,5 +51,7 @@ Templates from two skills recreate **six** Markdown trackers at the **adopting**
 | `refactor-code/` | Refactors; human applies risky edits (`disable-model-invocation`). |
 | `docs-style/` | README/doc IA refactors (`disable-model-invocation`). |
 | `skill-creator/` | Creating or iterating new skills under the active runtime `skills/<name>/`. |
+| `i-have-adhd/` | ADHD-friendly output style (`/i-have-adhd`). |
+| `ponytail/` (+ review/audit/debt/gain/help) | Minimal-code / YAGNI bias (`/ponytail`). |
 
-The last three skills do **not** define the six repo-root trackers above; see [skills.md](skills.md) for concepts.
+See [skills.md](skills.md) for concepts.

@@ -1,6 +1,8 @@
 # Shared Agent Blueprints — package manifest
 schema_version: 1
-version: 1.0.0
+# Package semver lives only in ./VERSION (single source of truth).
+# CLI resolves it via package_version(); do not duplicate a literal here.
+version_file: VERSION
 name: shared-agent-blueprints
 description: Reusable multi-agent harness, prompts, templates, and blueprint profiles for Cursor, Claude Code, and AGENTS.md-compatible tools.
 
@@ -21,6 +23,10 @@ blueprints:
     description: Lightweight startup profile — planning + PRD/ADR templates.
 
 harness:
+  entrypoint: HARNESS.md
+  managed: true
+  # Written into consumer state from ./VERSION at init/update time.
+  version_file: VERSION
   commands:
     - start.md
     - review.md
@@ -34,6 +40,17 @@ harness:
     - docs-style
     - skill-creator
     - refactor-code
+    - i-have-adhd
+    - ponytail
+    - ponytail-review
+    - ponytail-audit
+    - ponytail-debt
+    - ponytail-gain
+    - ponytail-help
+
+agents:
+  entrypoint: AGENTS.md
+  reference_managed_on_init_only: true
 
 prompts:
   commands:
@@ -52,6 +69,7 @@ prompts:
 templates:
   - entrypoints/AGENTS.md
   - entrypoints/CLAUDE.md
+  - entrypoints/HARNESS.md
   - gitignore
   - memory/planning.md
   - memory/decisions.md
@@ -64,8 +82,11 @@ templates:
   - review-checklist.md
 
 compatibility:
+  preserve_existing_agents: true
+  preserve_existing_claude: true
   # Paths written into consuming projects (not stored as live runtime in this package).
   consumer_install_targets:
+    - HARNESS.md
     - AGENTS.md
     - CLAUDE.md
     - .cursor/commands
@@ -83,6 +104,9 @@ compatibility:
   source_root: harness
   entrypoints_root: templates/entrypoints
   managed_marker: "<!-- managed-by: shared-agent-blueprints -->"
+  harness_reference_markers:
+    start: "<!-- BLUEPRINT:HARNESS:START -->"
+    end: "<!-- BLUEPRINT:HARNESS:END -->"
   package_must_not_contain:
     - .cursor/
     - .claude/
@@ -113,3 +137,6 @@ install:
     - ANTI-PATTERNS.md
     - ARCHITECTURE.md
     - .gitignore
+    - AGENTS.md
+    - agents.md
+    - CLAUDE.md

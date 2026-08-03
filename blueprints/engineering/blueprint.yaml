@@ -1,5 +1,5 @@
 name: engineering
-version: 1.0.0
+# Tracks package VERSION (./VERSION) — do not hardcode a semver here.
 extends: default
 description: Engineering workflows — commit playbook, review prompts, refactor skill.
 
