@@ -1,0 +1,24 @@
+# Memory & planning layers
+
+`/start` keeps **planning**, **telemetry**, **rationale**, **draft learning**, and **safety memory** in separate files in the **adopting project** so agents do not treat chat logs as the system of record.
+
+These files are **not** part of the blueprint package. Package templates live under `templates/memory/` and `harness/skills/*/templates.md`.
+
+## Consumer repo-root files
+
+| File | Concept | Lifecycle |
+|---|---|---|
+| `PLANNING.md` | Checklist-backed goal and tasks; canonical “what remains” | Rewritten each `/start` |
+| `RUN_LOG.md` | Batch **telemetry table**—scope, files, tests, status | Header reset on `/start`; append one row per delivery batch (~30-row cap) |
+| `DECISIONS.md` | **Why** logs—timestamped outcomes with reasoning | Skeleton on `/start`; append-only afterward |
+| `HOTCACHE.md` | Operational scratchpad: branch HEAD, hypotheses, immediate next steps | Replace frequently; avoid append sprawl |
+| `LEARNING.md` | Tentative reflections awaiting human consolidation | Cleared `/start`; not authoritative |
+| `ANTI-PATTERNS.md` | High-confidence hazards and safety bans | Defaults restored `/start`; grow only with review |
+| `ARCHITECTURE.md` | Stable system topology (optional asset) | **Never auto-reset on `/start`** |
+
+## Related skills
+
+- **[memory-system-protocol](../harness/skills/memory-system-protocol/SKILL.md)** explains consolidation, read order, and why each layer exists.
+- **[planning-execution-tracking](../harness/skills/planning-execution-tracking/SKILL.md)** governs checklist updates plus `DECISIONS` / `RUN_LOG` hygiene after each execution batch.
+
+Together they turn “what happened?” into auditable artifacts instead of long chat scrollback.

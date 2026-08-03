@@ -1,0 +1,115 @@
+# Shared Agent Blueprints — package manifest
+schema_version: 1
+version: 1.0.0
+name: shared-agent-blueprints
+description: Reusable multi-agent harness, prompts, templates, and blueprint profiles for Cursor, Claude Code, and AGENTS.md-compatible tools.
+
+blueprints:
+  - name: default
+    path: blueprints/default
+    extends: null
+    description: Core memory, planning, safety, and docs harness for any repo.
+
+  - name: engineering
+    path: blueprints/engineering
+    extends: default
+    description: Engineering workflows — commit/review prompts and optional forge profiles.
+
+  - name: startup
+    path: blueprints/startup
+    extends: default
+    description: Lightweight startup profile — planning + PRD/ADR templates.
+
+harness:
+  commands:
+    - start.md
+    - review.md
+    - commit.md
+  rules:
+    - safety-rules.mdc
+    - planning-execution-tracking.mdc
+  skills:
+    - memory-system-protocol
+    - planning-execution-tracking
+    - docs-style
+    - skill-creator
+    - refactor-code
+
+prompts:
+  commands:
+    - start.md
+    - commit.md
+    - review.md
+    - pr.md
+    - sync-dev.md
+    - fix-comment.md
+    - prerequisite.md
+  reviews:
+    - code-review.md
+  system:
+    - agent-system.md
+
+templates:
+  - entrypoints/AGENTS.md
+  - entrypoints/CLAUDE.md
+  - gitignore
+  - memory/planning.md
+  - memory/decisions.md
+  - memory/run-log.md
+  - memory/hotcache.md
+  - memory/anti-patterns.md
+  - memory/learning.md
+  - prd.md
+  - adr.md
+  - review-checklist.md
+
+compatibility:
+  # Paths written into consuming projects (not stored as live runtime in this package).
+  consumer_install_targets:
+    - AGENTS.md
+    - CLAUDE.md
+    - .cursor/commands
+    - .cursor/skills
+    - .cursor/rules
+    - .cursor/templates
+    - .claude/commands
+    - .claude/skills
+    - .claude/rules
+    - .claude/templates
+  docs_root: docs/
+  runtime_roots:
+    - .cursor
+    - .claude
+  source_root: harness
+  entrypoints_root: templates/entrypoints
+  managed_marker: "<!-- managed-by: shared-agent-blueprints -->"
+  package_must_not_contain:
+    - .cursor/
+    - .claude/
+    - PLANNING.md
+    - DECISIONS.md
+    - RUN_LOG.md
+    - HOTCACHE.md
+    - LEARNING.md
+    - ANTI-PATTERNS.md
+    - .agent-blueprint.yaml
+  local_override_files:
+    - .agent-blueprint.local.yaml
+    - AGENTS.local.md
+    - CLAUDE.local.md
+
+install:
+  conflict_policy: preserve-local
+  default_runtime: prompt
+  copy_memory_templates_to_root: true
+  source_cache: "${XDG_CACHE_HOME:-$HOME/.cache}/blueprint/repos"
+  history: "${XDG_DATA_HOME:-$HOME/.local/share}/blueprint/history.jsonl"
+  do_not_overwrite:
+    - PLANNING.md
+    - DECISIONS.md
+    - RUN_LOG.md
+    - HOTCACHE.md
+    - LEARNING.md
+    - ANTI-PATTERNS.md
+    - ARCHITECTURE.md
+    - .gitignore

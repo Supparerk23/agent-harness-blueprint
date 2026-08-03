@@ -1,0 +1,12 @@
+# Example generated install state for a consuming project.
+# In a real repo this file is written by `blueprint install`.
+# When source is a git URL, install/sync fetch a local cache then copy.
+source: https://github.com/example/agent-harness-blueprint
+version: 1.0.0
+blueprint: engineering
+overlay: gitlab
+runtimes:
+  - cursor
+  - claude
+installed_at_utc: 2026-07-29T00:00:00Z
+conflict_policy: preserve-local

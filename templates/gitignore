@@ -1,9 +1,5 @@
-.DS_Store
-*.blueprint-conflict
-.tmp-consumer-test/
-.tmp-consumer-test-*/
-
-# Adoption/runtime artifacts belong in consuming projects, not this package
+# --- shared-agent-blueprints (managed) ---
+# Local overrides and install conflict siblings — keep out of git.
 .cursor/
 .claude/
 PLANNING.md
@@ -12,9 +8,10 @@ RUN_LOG.md
 HOTCACHE.md
 LEARNING.md
 ANTI-PATTERNS.md
-.agent-blueprint.yaml
+*.blueprint-conflict
 .agent-blueprint.local.yaml
 .agent-blueprint/
 AGENTS.local.md
 CLAUDE.local.md
 targets.json
+# --- end shared-agent-blueprints ---
