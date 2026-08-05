@@ -1899,8 +1899,9 @@ menu_prompt_target() {
 
   if [[ "$(targets_count)" -gt 0 ]]; then
     while true; do
-      menu_prompt_target_pick
-      local pick_rc=$?
+      # Under set -e, a bare call that returns 1/2 (add/q) would abort the CLI.
+      local pick_rc=0
+      menu_prompt_target_pick || pick_rc=$?
       if [[ "$pick_rc" -eq 0 ]]; then
         return 0
       fi
