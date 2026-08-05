@@ -36,6 +36,16 @@ Narrative docs for this shared agent blueprint package. Start from the root [REA
 | [quick-start.md](quick-start.md) | `/start` ritual in adopting projects |
 | [memory-and-planning.md](memory-and-planning.md) | Consumer memory files + template sources |
 
+### Community
+
+| Document | Contents |
+|---|---|
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Dev setup, branches, PRs, testing |
+| [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) | Contributor Covenant 3.0 |
+| [SECURITY.md](../SECURITY.md) | Vulnerability reporting |
+| [CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog release notes |
+| [github-labels.md](github-labels.md) | Recommended GitHub labels |
+
 ## CLI
 
 ```bash

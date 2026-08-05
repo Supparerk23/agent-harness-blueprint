@@ -31,7 +31,7 @@ ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
 
 ```yaml
 schema_version: 1
-source: https://github.com/xxx/agent-harness-blueprint
+source: https://github.com/Supparerk23/agent-harness-blueprint
 version: <from package VERSION>   # written by CLI from ./VERSION
 blueprint: engineering
 overlay: gitlab

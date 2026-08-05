@@ -1,4 +1,6 @@
-# Rules — concepts (`harness/rules/` → consumer runtime `rules/`)
+# Rules
+
+Concepts for files under `harness/rules/` (projected into the consumer runtime `rules/` directory).
 
 Rules are markdown files with YAML frontmatter:
 

@@ -18,7 +18,7 @@ Consumers use the CLI (never copy package-root docs as the product contract):
 
 `init` writes consumer `HARNESS.md`, injects a managed harness reference into `AGENTS.md` or existing `agents.md`, and seeds memory skeletons. `install` projects `harness/` into `.cursor/` and/or `.claude/` per `--runtime`. `update` refreshes only `HARNESS.md`.
 
-See [README.md](README.md) and [docs/](docs/).
+See [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [docs/](docs/).
 
 ## Package edit order
 

@@ -1,10 +1,40 @@
 .DS_Store
+*~
+*.swp
+*.swo
+
+# Editor / IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs / coverage / build artifacts
+*.log
+coverage/
+.coverage
+dist/
+build/
+*.egg-info/
+
+# Language tooling (defensive; package is Bash-first)
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
 *.blueprint-conflict
 .tmp-consumer-test/
 .tmp-consumer-test-*/
 .tmp-skill-src/
 .tmp-harness-test/
 .tmp-harness-test-*/
+.tmp-harness-test-*
 
 # Adoption/runtime artifacts belong in consuming projects, not this package
 .cursor/

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Supparerk23/agent-harness-blueprint/security/advisories/new
+    about: Report a security issue privately (do not open a public issue).
+  - name: Documentation
+    url: https://github.com/Supparerk23/agent-harness-blueprint/blob/main/docs/README.md
+    about: Browse the package documentation index.

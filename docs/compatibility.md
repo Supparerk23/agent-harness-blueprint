@@ -40,6 +40,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 6. Optional: symlink `blueprint` onto PATH. When `source` in `.agent-blueprint.yaml` is a git URL, install/sync use a cache under `$XDG_CACHE_HOME/blueprint/repos/`.
 
 See [harness-ownership.md](harness-ownership.md) for precedence, markers, and recovery.
+
 ## Runtime projection
 
 | Source | Cursor | Claude Code |

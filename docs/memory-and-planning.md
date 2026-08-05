@@ -1,4 +1,4 @@
-# Memory & planning layers
+# Memory and planning
 
 `/start` keeps **planning**, **telemetry**, **rationale**, **draft learning**, and **safety memory** in separate files in the **adopting project** so agents do not treat chat logs as the system of record.
 
