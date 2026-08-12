@@ -1,8 +1,8 @@
-# Skills — concepts
+# Skills
 
 Package sources live under [harness/skills/](../harness/skills/). After install, the same folders appear under the consumer's `.cursor/skills/` and/or `.claude/skills/` as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
 
-## `planning-execution-tracking`
+## `task-execution`
 
 **Intent:** Tie each implementation batch back to observable artifacts in the **adopting project**:
 
@@ -13,7 +13,7 @@ Package sources live under [harness/skills/](../harness/skills/). After install,
 
 Use whenever execution must leave audit breadcrumbs—not casual Q&A.
 
-## `memory-system-protocol`
+## `context-recall`
 
 **Intent:** Define *how layered memory behaves* versus chat history:
 

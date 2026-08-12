@@ -67,8 +67,8 @@ Skills live under the active runtime (`<runtime>/skills/`). Prefer matching a sk
 | Whole-repo complexity hunt | `/ponytail-audit` | **Ask before** a large audit. |
 | Deferred `ponytail:` shortcuts piling up | `/ponytail-debt` | Suggest when harvesting “later” notes. |
 | Need ponytail command cheat sheet | `/ponytail-help` | On request. |
-| Executing / updating `PLANNING.md` batches | `planning-execution-tracking` | Use when work must leave PLANNING / DECISIONS / RUN_LOG breadcrumbs. |
-| Reading or updating memory layers | `memory-system-protocol` | Use when memory files drive the session. |
+| Executing / updating `PLANNING.md` batches | `task-execution` | Use when work must leave PLANNING / DECISIONS / RUN_LOG breadcrumbs. |
+| Reading or updating memory layers | `context-recall` | Use when memory files drive the session. |
 | Docs IA / README split | `docs-style` | Opt-in / explicit invoke. |
 | Creating or tuning a skill | `skill-creator` | Opt-in / explicit invoke. |
 | Simplify / dedupe / modularity refactor | `refactor-code` + `/ponytail` | **Required pairing:** when `/refactor-code` (or refactor-code) is invoked, **must** also enable `/ponytail` (default `full`). Applies to any programming language. Do not run refactor-code alone. Prefer `/ponytail-review` on the resulting diff. |

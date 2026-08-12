@@ -1,6 +1,6 @@
 # Harness ownership and agent entrypoints
 
-How `HARNESS.md` relates to `AGENTS.md` / `agents.md` / `CLAUDE.md` in adopting projects.
+How `HARNESS.md` relates to root instruction files (`AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md`) in adopting projects.
 
 ## Ownership model
 
@@ -10,34 +10,36 @@ How `HARNESS.md` relates to `AGENTS.md` / `agents.md` / `CLAUDE.md` in adopting 
 | Managed runtime projections (`.cursor/` / `.claude/`) | Blueprint Service | via `install` | Yes (when runtimes declared) |
 | Managed `.gitignore` section | Blueprint Service | Yes | Yes |
 | `.agent-blueprint.yaml` version fields | Blueprint Service | Yes | Yes |
-| Managed block in `AGENTS.md` | Blueprint Service | Yes | No |
-| Managed block in `agents.md` | Blueprint Service | Yes | No |
+| Managed block in selected instruction file | Blueprint Service | Yes | No |
 | Content outside managed markers | User | No | No |
-| `CLAUDE.md` | User | No | No |
+| Non-selected instruction files | User | No | No |
 
-The Blueprint Service never overwrites a user-owned file completely unless it is **creating** a file that does not exist.
+The Blueprint Service never overwrites a user-owned file completely unless it is **creating** a file that does not exist (`AGENTS.md` from the canonical template).
 
 ## Precedence (agent instruction files)
 
-Case-sensitive detection at the project root:
+Case-sensitive detection at the **repository root only** (never recursive; ignore nested copies under `.cursor/`, `.claude/`, `docs/`, `examples/`, `templates/`, etc.):
 
 1. `AGENTS.md`
 2. `agents.md`
-3. Create `AGENTS.md`
+3. `CLAUDE.md`
+4. `claude.md`
+5. Create `AGENTS.md` from `templates/entrypoints/AGENTS.md`
 
 Rules:
 
-- Do not rename `agents.md` → `AGENTS.md`
-- Do not merge the two files
-- If both exist, select `AGENTS.md`, leave `agents.md` untouched, emit a non-fatal warning
-- `CLAUDE.md` is never a substitute for the agents entrypoint and is never modified by `init` / `update`
+- Do not rename or merge instruction files
+- If both `AGENTS.md` and `agents.md` exist, select `AGENTS.md`, leave `agents.md` untouched, emit a non-fatal warning
+- If both `CLAUDE.md` and `claude.md` exist, select by the same precedence ladder (Claude files only win when no agents file exists)
+- Never create `CLAUDE.md` / `claude.md` automatically
+- `templates/entrypoints/CLAUDE.md` is the canonical Claude reference template for humans; it is not written by `init`
 
 ## Initialization (`blueprint init`)
 
-1. Detect `CLAUDE.md` (report only)
-2. Resolve agents entrypoint by precedence
-3. Create or safely install root `HARNESS.md` from `templates/entrypoints/HARNESS.md`
-4. Insert or reconcile the managed Harness Reference block in the selected agents file
+1. Detect root instruction files by precedence (report Claude presence)
+2. Create or safely install root `HARNESS.md` from `templates/entrypoints/HARNESS.md`
+3. If no instruction file exists: copy the canonical `AGENTS.md` template as-is
+4. On the selected instruction file: insert or reconcile the compact managed Blueprint block (markers below)
 5. Write memory skeletons / managed `.gitignore` / state as before
 
 Managed reference markers (stable):
@@ -49,7 +51,7 @@ Managed reference markers (stable):
 <!-- BLUEPRINT:HARNESS:END -->
 ```
 
-Only content between the markers is Blueprint-owned. Everything else is preserved byte-for-byte aside from the smallest patch needed to add or replace that block.
+The compact block only **references** Blueprint-managed files (`HARNESS.md`, memory trackers). It does not duplicate full harness context. Only content between the markers is Blueprint-owned. Everything else is preserved byte-for-byte aside from the smallest patch needed to add or replace that block. Re-running `init` never duplicates the block.
 
 ### Existing `HARNESS.md`
 
@@ -58,7 +60,7 @@ Only content between the markers is Blueprint-owned. Everything else is preserve
 
 ### Malformed markers
 
-If only `START` or only `END` is present (or duplicates), `init` leaves the agents file unchanged and warns. Repair markers manually, then re-run `init`. The service does not guess how to splice a broken region.
+If only `START` or only `END` is present (or duplicates), `init` leaves the instruction file unchanged and warns. Repair markers manually, then re-run `init`. The service does not guess how to splice a broken region.
 
 ## Update (`blueprint update`)
 
@@ -69,15 +71,19 @@ If only `START` or only `END` is present (or duplicates), `init` leaves the agen
    - managed `.gitignore` section
    - stamp package version into state + targets registry
 
+### Skill / rule renames
+
+`update` (and install/sync projections) read [`harness/migrations/renames.log`](../harness/migrations/renames.log) and **remove obsolete paths** under each installed runtime before writing current names. Example: `memory-system-protocol` → `context-recall`, `planning-execution-tracking` → `task-execution`.
+
+On `update` only, package skills and rules are **full-refreshed** (destination skill dirs wiped, then copied from the package) so stale files inside a renamed or rebuilt skill do not linger. Append a new row to `renames.log` whenever you rename a managed skill or rule — keep historical rows.
+
 Does **not** modify:
 
-- `AGENTS.md`
-- `agents.md`
-- `CLAUDE.md`
+- `AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md`
 
 even when the managed reference block is missing or outdated. Reconcile the reference block with `blueprint init` (or a future dedicated repair command), not `update`.
 
-`sync` remains available to re-apply the installed blueprint without the version-gated update UX.
+`sync` remains available to re-apply the installed blueprint without the version-gated update UX (still applies rename cleanup, but uses preserve-local copy semantics for skill files).
 
 ## Recovery
 

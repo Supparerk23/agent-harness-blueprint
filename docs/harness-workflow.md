@@ -20,7 +20,7 @@ flowchart TD
 
 ### 1. Orient
 
-Read [`HARNESS.md`](../HARNESS.md) first for lifecycle and gates, then `AGENTS.md`, then local overrides, then rules/skills relevant to the task.
+Read [`HARNESS.md`](../templates/entrypoints/HARNESS.md) first for lifecycle and gates (projected into the consumer on `init`), then `AGENTS.md`, then local overrides, then rules/skills relevant to the task.
 
 ### 2. `/start`
 

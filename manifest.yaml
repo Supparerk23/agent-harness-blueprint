@@ -33,10 +33,10 @@ harness:
     - commit.md
   rules:
     - safety-rules.mdc
-    - planning-execution-tracking.mdc
+    - task-execution.mdc
   skills:
-    - memory-system-protocol
-    - planning-execution-tracking
+    - context-recall
+    - task-execution
     - docs-style
     - skill-creator
     - refactor-code
@@ -140,3 +140,4 @@ install:
     - AGENTS.md
     - agents.md
     - CLAUDE.md
+    - claude.md

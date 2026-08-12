@@ -1,4 +1,6 @@
-# Rules — concepts (`harness/rules/` → consumer runtime `rules/`)
+# Rules
+
+Concepts for files under `harness/rules/` (projected into the consumer runtime `rules/` directory).
 
 Rules are markdown files with YAML frontmatter:
 
@@ -10,9 +12,9 @@ Shared defaults live under `harness/rules/`. After install:
 - Cursor: `.cursor/rules/*.mdc`
 - Claude Code: `.claude/rules/*.md` (same content; Cursor-only frontmatter keys are ignored)
 
-## `planning-execution-tracking`
+## `task-execution`
 
-Thin shim that points agents to the **planning-execution-tracking** skill: after each coded batch ensure `PLANNING.md` stays truthful, append `DECISIONS.md`, and rotate `RUN_LOG.md` telemetry with retention enforced.
+Thin shim that points agents to the **task-execution** skill: after each coded batch ensure `PLANNING.md` stays truthful, append `DECISIONS.md`, and rotate `RUN_LOG.md` telemetry with retention enforced.
 
 ## `safety-rules`
 
