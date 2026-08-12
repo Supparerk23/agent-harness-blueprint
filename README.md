@@ -149,7 +149,7 @@ Flags:
 |---|---|
 | `init` | `HARNESS.md`, agent harness reference, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
 | `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` |
-| `update` | Version check vs package `VERSION`, refresh `HARNESS.md` + managed runtimes — never rewrites agent instruction files |
+| `update` | Version check vs package `VERSION`, refresh `HARNESS.md`, apply skill/rule renames, full-refresh managed skills/rules — never rewrites agent instruction files |
 | `sync` | Re-applies the installed blueprint (`preserve-local`); may fetch a remote `source` |
 | `del` | Removes managed blueprint + memory files; preserves agent instruction bodies |
 

@@ -10,10 +10,10 @@ includes:
       - review.md
     rules:
       - safety-rules.mdc
-      - planning-execution-tracking.mdc
+      - task-execution.mdc
     skills:
-      - memory-system-protocol
-      - planning-execution-tracking
+      - context-recall
+      - task-execution
       - docs-style
       - skill-creator
       - i-have-adhd

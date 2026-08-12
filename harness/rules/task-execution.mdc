@@ -1,12 +1,12 @@
 ---
-description: Route planning execution tracking to the dedicated skill
+description: Route task execution tracking to the dedicated skill
 alwaysApply: true
 ---
 
-# Planning Execution Tracking
+# Task Execution
 
 This rule intentionally stays thin to avoid overlap with the project skill:
-`<runtime>/skills/planning-execution-tracking/SKILL.md` (`.cursor` or `.claude`).
+`<runtime>/skills/task-execution/SKILL.md` (`.cursor` or `.claude`).
 
 When a user asks to execute work from `PLANNING.md` (or update planning progress),
 always apply that skill and follow its workflow.

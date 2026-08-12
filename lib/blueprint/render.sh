@@ -33,7 +33,7 @@ render_status() {
   fi
 }
 
-# Claude Code–style welcome banner: pixel icon | title · meta · path
+# Code-style welcome banner: pixel icon | title · meta · path
 # Args: version, meta_line, path_line
 render_banner() {
   local version="$1"

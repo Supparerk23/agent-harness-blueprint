@@ -1,9 +1,9 @@
 ---
-name: planning-execution-tracking
+name: task-execution
 description: Execute tasks from PLANNING.md and keep project tracking files synchronized. Use when the user asks to run items from planning, update task status, log implementation rationale in DECISIONS.md, or record execution telemetry in RUN_LOG.md.
 ---
 
-# Planning Execution Tracking
+# Task Execution
 
 ## Purpose
 Keep execution traceable and consistent by updating planning, decisions, and run telemetry in the same delivery batch.

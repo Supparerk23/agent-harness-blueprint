@@ -5,8 +5,8 @@ Core shared agent harness for any repository.
 ## Installs
 
 - Commands: `/start`, `/review`
-- Rules: safety, planning-execution-tracking
-- Skills: memory-system-protocol, planning-execution-tracking, docs-style, skill-creator
+- Rules: safety, task-execution
+- Skills: context-recall, task-execution, docs-style, skill-creator
 - Memory templates under `templates/memory/`
 - Consumer entrypoints from `templates/entrypoints/`
 

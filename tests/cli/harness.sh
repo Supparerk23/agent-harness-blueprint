@@ -150,7 +150,9 @@ assert_file "HARNESS.md" "$d/HARNESS.md"
 assert_file "AGENTS.md" "$d/AGENTS.md"
 assert_exact "no CLAUDE.md created" "$d" "CLAUDE.md" 0
 assert_contains "init banner" "$out" "Blueprint initialized"
+assert_contains "canonical template body" "$(cat "$d/AGENTS.md")" "Shared agent contract for this repository"
 assert_contains "markers" "$(cat "$d/AGENTS.md")" "<!-- BLUEPRINT:HARNESS:START -->"
+assert_contains "memory refs in block" "$(cat "$d/AGENTS.md")" "PLANNING.md"
 
 echo "== 2. existing AGENTS.md =="
 d="$(fresh case2)"
@@ -161,6 +163,17 @@ assert_file "HARNESS.md" "$d/HARNESS.md"
 assert_contains "kept custom" "$(cat "$d/AGENTS.md")" "Keep me."
 assert_eq "outside markers preserved" "$(outside_markers_preserved "$d/AGENTS.md")" "$before_out"
 assert_count "one start marker" "$(cat "$d/AGENTS.md")" "<!-- BLUEPRINT:HARNESS:START -->" "1"
+assert_not_contains() {
+  local label="$1" hay="$2" needle="$3"
+  if printf '%s' "$hay" | grep -qF "$needle"; then
+    echo "  FAIL  $label (unexpected '$needle')"
+    FAIL=$((FAIL + 1))
+  else
+    echo "  PASS  $label"
+    PASS=$((PASS + 1))
+  fi
+}
+assert_not_contains "no full template injected" "$(cat "$d/AGENTS.md")" "Required setup"
 
 echo "== 3. existing agents.md =="
 d="$(fresh case3)"
@@ -174,11 +187,22 @@ assert_contains "lower content" "$(cat "$d/agents.md")" "lower agents"
 echo "== 4. CLAUDE.md only =="
 d="$(fresh case4)"
 printf '# Claude only\n' > "$d/CLAUDE.md"
-claude_before="$(cat "$d/CLAUDE.md")"
 CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
-assert_file "AGENTS.md created" "$d/AGENTS.md"
+assert_exact "no AGENTS.md created" "$d" "AGENTS.md" 0
 assert_file "HARNESS.md" "$d/HARNESS.md"
-assert_eq "CLAUDE.md unchanged" "$(cat "$d/CLAUDE.md")" "$claude_before"
+assert_contains "claude content kept" "$(cat "$d/CLAUDE.md")" "Claude only"
+assert_contains "ref in CLAUDE.md" "$(cat "$d/CLAUDE.md")" "<!-- BLUEPRINT:HARNESS:START -->"
+assert_count "one start on CLAUDE" "$(cat "$d/CLAUDE.md")" "<!-- BLUEPRINT:HARNESS:START -->" "1"
+
+echo "== 4b. claude.md only =="
+d="$(fresh case4b)"
+printf '# lower claude\n' > "$d/claude.md"
+CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
+assert_exact "no AGENTS.md" "$d" "AGENTS.md" 0
+assert_exact "no CLAUDE.md" "$d" "CLAUDE.md" 0
+assert_exact "claude.md kept" "$d" "claude.md" 1
+assert_contains "ref in claude.md" "$(cat "$d/claude.md")" "<!-- BLUEPRINT:HARNESS:START -->"
+assert_contains "lower claude kept" "$(cat "$d/claude.md")" "lower claude"
 
 echo "== 5. CLAUDE.md + AGENTS.md =="
 d="$(fresh case5)"
@@ -244,17 +268,8 @@ EOF
 before_out="$(outside_markers_preserved "$d/AGENTS.md")"
 CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
 assert_eq "surrounding preserved" "$(outside_markers_preserved "$d/AGENTS.md")" "$before_out"
-assert_contains "new block" "$(cat "$d/AGENTS.md")" "root-level"
-assert_not_contains() {
-  local label="$1" hay="$2" needle="$3"
-  if printf '%s' "$hay" | grep -qF "$needle"; then
-    echo "  FAIL  $label (unexpected '$needle')"
-    FAIL=$((FAIL + 1))
-  else
-    echo "  PASS  $label"
-    PASS=$((PASS + 1))
-  fi
-}
+assert_contains "new block" "$(cat "$d/AGENTS.md")" "shared-agent-blueprints"
+assert_contains "memory pointer" "$(cat "$d/AGENTS.md")" "PLANNING.md"
 assert_not_contains "old block gone" "$(cat "$d/AGENTS.md")" "OLD BLOCK"
 
 echo "== 10. formatting preserved outside markers =="
@@ -359,6 +374,75 @@ set -e
 assert_eq "ensure failed" "$rc" "1"
 assert_eq "rolled back content" "$(cat "$d/AGENTS.md")" "$before"
 eval "$orig_write"
+
+echo "== 19. nested instruction files ignored =="
+d="$(fresh case19)"
+mkdir -p "$d/.cursor" "$d/.claude" "$d/docs" "$d/examples" "$d/templates"
+printf '# nested cursor\n' > "$d/.cursor/AGENTS.md"
+printf '# nested claude\n' > "$d/.claude/CLAUDE.md"
+printf '# nested docs\n' > "$d/docs/AGENTS.md"
+printf '# nested examples\n' > "$d/examples/AGENTS.md"
+printf '# nested templates\n' > "$d/templates/AGENTS.md"
+CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
+assert_file "root AGENTS created" "$d/AGENTS.md"
+assert_eq "nested .cursor untouched" "$(cat "$d/.cursor/AGENTS.md")" "# nested cursor"
+assert_eq "nested .claude untouched" "$(cat "$d/.claude/CLAUDE.md")" "# nested claude"
+assert_eq "nested docs untouched" "$(cat "$d/docs/AGENTS.md")" "# nested docs"
+assert_eq "nested examples untouched" "$(cat "$d/examples/AGENTS.md")" "# nested examples"
+assert_eq "nested templates untouched" "$(cat "$d/templates/AGENTS.md")" "# nested templates"
+assert_contains "root got markers" "$(cat "$d/AGENTS.md")" "<!-- BLUEPRINT:HARNESS:START -->"
+assert_not_contains "nested cursor no markers" "$(cat "$d/.cursor/AGENTS.md")" "BLUEPRINT:HARNESS:START"
+
+echo "== 20. CLAUDE.md re-init idempotent =="
+d="$(fresh case20)"
+printf '# Claude body\n' > "$d/CLAUDE.md"
+CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
+CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
+assert_exact "still no AGENTS.md" "$d" "AGENTS.md" 0
+assert_count "single start on CLAUDE" "$(cat "$d/CLAUDE.md")" "<!-- BLUEPRINT:HARNESS:START -->" "1"
+assert_count "single end on CLAUDE" "$(cat "$d/CLAUDE.md")" "<!-- BLUEPRINT:HARNESS:END -->" "1"
+assert_contains "claude body kept" "$(cat "$d/CLAUDE.md")" "Claude body"
+
+echo "== 21. del strips CLAUDE.md reference block =="
+d="$(fresh case21)"
+printf '# Claude del\nkeep me\n' > "$d/CLAUDE.md"
+CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
+CI=1 NO_COLOR=1 "$BP" del --force --target "$d" >/dev/null 2>&1
+assert_exact "no AGENTS after del" "$d" "AGENTS.md" 0
+assert_file "CLAUDE preserved" "$d/CLAUDE.md"
+assert_contains "claude body after del" "$(cat "$d/CLAUDE.md")" "keep me"
+assert_eq "block stripped" "$(grep -cF 'BLUEPRINT:HARNESS:START' "$d/CLAUDE.md" || true)" "0"
+
+echo "== 22. update removes renamed skills/rules and full-refreshes =="
+d="$(fresh case22)"
+CI=1 NO_COLOR=1 "$BP" init --target "$d" >/dev/null 2>&1
+CI=1 NO_COLOR=1 "$BP" install default --runtime cursor --target "$d" >/dev/null 2>&1
+# Simulate pre-rename consumer state
+mkdir -p "$d/.cursor/skills/memory-system-protocol" "$d/.cursor/skills/planning-execution-tracking"
+printf '# stale old skill\n' > "$d/.cursor/skills/memory-system-protocol/SKILL.md"
+printf '# stale planning skill\n' > "$d/.cursor/skills/planning-execution-tracking/SKILL.md"
+printf '# stale rule\n' > "$d/.cursor/rules/planning-execution-tracking.mdc"
+# Stale file inside current skill name (full refresh must drop it)
+printf '# orphan inside skill\n' > "$d/.cursor/skills/context-recall/ORPHAN.md"
+assert_file "old skill present before update" "$d/.cursor/skills/memory-system-protocol/SKILL.md"
+out="$(CI=1 NO_COLOR=1 "$BP" update --target "$d" 2>&1)"
+assert_contains "update mentions rename/full refresh" "$out" "rename cleanup + full skill/rule refresh"
+assert_not_file "old memory skill removed" "$d/.cursor/skills/memory-system-protocol"
+assert_not_file "old planning skill removed" "$d/.cursor/skills/planning-execution-tracking"
+assert_not_file "old planning rule removed" "$d/.cursor/rules/planning-execution-tracking.mdc"
+assert_file "new context-recall present" "$d/.cursor/skills/context-recall/SKILL.md"
+assert_file "new task-execution present" "$d/.cursor/skills/task-execution/SKILL.md"
+assert_file "new task-execution rule present" "$d/.cursor/rules/task-execution.mdc"
+assert_not_file "orphan inside skill removed" "$d/.cursor/skills/context-recall/ORPHAN.md"
+assert_contains "context-recall name" "$(cat "$d/.cursor/skills/context-recall/SKILL.md")" "name: context-recall"
+assert_contains "task-execution name" "$(cat "$d/.cursor/skills/task-execution/SKILL.md")" "name: task-execution"
+
+echo "== 23. renames.log exists for rebuild =="
+assert_file "renames log" "${ROOT}/harness/migrations/renames.log"
+assert_contains "log has memory rename" "$(cat "${ROOT}/harness/migrations/renames.log")" "memory-system-protocol"
+assert_contains "log has planning rename" "$(cat "${ROOT}/harness/migrations/renames.log")" "planning-execution-tracking"
+assert_contains "log has context-recall" "$(cat "${ROOT}/harness/migrations/renames.log")" "context-recall"
+assert_contains "log has task-execution" "$(cat "${ROOT}/harness/migrations/renames.log")" "task-execution"
 
 echo
 echo "Results: ${PASS} passed, ${FAIL} failed"

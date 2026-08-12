@@ -8,7 +8,8 @@ HARNESS_FILE_MARKER="<!-- managed-by: shared-agent-blueprints -->"
 
 # Populated by detect_agent_entrypoint
 HARNESS_SELECTED_PATH=""
-HARNESS_SELECTED_SOURCE="" # AGENTS.md | agents.md | created
+# AGENTS.md | agents.md | CLAUDE.md | claude.md | created
+HARNESS_SELECTED_SOURCE=""
 HARNESS_CLAUDE_DETECTED=0
 HARNESS_WARNINGS=()
 
@@ -60,12 +61,22 @@ harness_exact_path() {
   return 1
 }
 
+agents_template_path() {
+  echo "${PACKAGE_ROOT}/templates/entrypoints/AGENTS.md"
+}
+
+# Compact managed integration block for existing instruction files.
+# References Blueprint-managed files only — does not duplicate full harness context.
 harness_managed_block() {
   cat <<EOF
 ${HARNESS_REF_START}
 ## Shared Harness
-Before starting any task, read and follow the instructions in the root-level [\`HARNESS.md\`](./HARNESS.md).
-The lifecycle, safety constraints, quality gates, review requirements, and completion criteria defined in \`HARNESS.md\` are mandatory for all agents operating in this repository.
+
+This repository uses **shared-agent-blueprints**. Before starting work, read:
+
+- [\`HARNESS.md\`](./HARNESS.md) — lifecycle, safety, quality gates, and workflow
+- Memory trackers when executing planned work: \`PLANNING.md\`, \`DECISIONS.md\`, \`RUN_LOG.md\`, \`HOTCACHE.md\`, \`LEARNING.md\`, \`ANTI-PATTERNS.md\`
+
 Existing project-specific instructions in this file remain applicable. When instructions conflict, follow the precedence rules defined in \`HARNESS.md\`.
 ${HARNESS_REF_END}
 EOF
@@ -127,6 +138,8 @@ harness_atomic_copy() {
 }
 
 # detect_agent_entrypoint <projectRoot>
+# Root-only, case-sensitive detection. Never searches subdirectories.
+# Precedence: AGENTS.md > agents.md > CLAUDE.md > claude.md > create AGENTS.md
 detect_agent_entrypoint() {
   local root="$1"
   HARNESS_SELECTED_PATH=""
@@ -134,20 +147,27 @@ detect_agent_entrypoint() {
   HARNESS_CLAUDE_DETECTED=0
   HARNESS_WARNINGS=()
 
-  if harness_exact_exists "$root" "CLAUDE.md"; then
-    HARNESS_CLAUDE_DETECTED=1
-  fi
-
-  local agents_path="" agents_lower=""
+  local agents_path="" agents_lower="" claude_path="" claude_lower=""
   if harness_exact_exists "$root" "AGENTS.md"; then
     agents_path="$(harness_exact_path "$root" "AGENTS.md")"
   fi
   if harness_exact_exists "$root" "agents.md"; then
     agents_lower="$(harness_exact_path "$root" "agents.md")"
   fi
+  if harness_exact_exists "$root" "CLAUDE.md"; then
+    claude_path="$(harness_exact_path "$root" "CLAUDE.md")"
+    HARNESS_CLAUDE_DETECTED=1
+  fi
+  if harness_exact_exists "$root" "claude.md"; then
+    claude_lower="$(harness_exact_path "$root" "claude.md")"
+    HARNESS_CLAUDE_DETECTED=1
+  fi
 
   if [[ -n "$agents_path" && -n "$agents_lower" && "$agents_path" != "$agents_lower" ]]; then
     HARNESS_WARNINGS+=("Both AGENTS.md and agents.md exist; selecting AGENTS.md by precedence. Left agents.md unchanged.")
+  fi
+  if [[ -n "$claude_path" && -n "$claude_lower" && "$claude_path" != "$claude_lower" ]]; then
+    HARNESS_WARNINGS+=("Both CLAUDE.md and claude.md exist; selecting CLAUDE.md by precedence when no agents file is present. Left the non-selected Claude file unchanged.")
   fi
 
   if [[ -n "$agents_path" ]]; then
@@ -159,6 +179,18 @@ detect_agent_entrypoint() {
   if [[ -n "$agents_lower" ]]; then
     HARNESS_SELECTED_PATH="$agents_lower"
     HARNESS_SELECTED_SOURCE="agents.md"
+    return 0
+  fi
+
+  if [[ -n "$claude_path" ]]; then
+    HARNESS_SELECTED_PATH="$claude_path"
+    HARNESS_SELECTED_SOURCE="CLAUDE.md"
+    return 0
+  fi
+
+  if [[ -n "$claude_lower" ]]; then
+    HARNESS_SELECTED_PATH="$claude_lower"
+    HARNESS_SELECTED_SOURCE="claude.md"
     return 0
   fi
 
@@ -250,7 +282,9 @@ harness_read_file() {
 }
 
 # ensure_harness_reference <agentFilePath>
-# Inserts or reconciles the managed Harness Reference block. User content outside markers is untouched.
+# For an existing instruction file: append or reconcile the compact managed block.
+# User content outside markers is never overwritten. Creating a missing AGENTS.md uses
+# templates/entrypoints/AGENTS.md as-is, then adds the managed block once.
 ensure_harness_reference() {
   local agent_file="$1"
   local start_count end_count
@@ -261,32 +295,26 @@ ensure_harness_reference() {
     if [[ -f "$agent_file" ]]; then
       emit_info "dry-run: would reconcile harness reference in $(basename "$agent_file")"
     else
-      emit_info "dry-run: would create $(basename "$agent_file") with harness reference"
+      emit_info "dry-run: would create $(basename "$agent_file") from template with harness reference"
     fi
     HARNESS_SUMMARY_REF="Would add/update managed Harness Reference"
     return 0
   fi
 
   if [[ ! -f "$agent_file" ]]; then
-    local content
-    content="# AGENTS.md
-
-Shared agent contract for this repository. Shared lifecycle and workflow rules live in [\`HARNESS.md\`](./HARNESS.md). Keep project-specific topics in this file.
-
-## Project topics
-
-Add repository-specific guidance here (stack conventions, domain context, ownership).
-
-${block}
-"
-    if ! harness_atomic_write "$agent_file" "$content"; then
-      emit_error "failed to create $(basename "$agent_file")"
+    local agents_tmpl
+    agents_tmpl="$(agents_template_path)"
+    if [[ ! -f "$agents_tmpl" ]]; then
+      emit_error "missing AGENTS.md template at ${agents_tmpl}"
+      return 1
+    fi
+    if ! harness_atomic_copy "$agents_tmpl" "$agent_file"; then
+      emit_error "failed to create $(basename "$agent_file") from template"
       return 1
     fi
     emit_file_added "$agent_file"
     HARNESS_SUMMARY_AGENT="Created AGENTS.md"
-    HARNESS_SUMMARY_REF="Added managed Harness Reference"
-    return 0
+    # Fall through to append the managed block onto the template body.
   fi
 
   start_count="$(harness_count_marker "$agent_file" "$HARNESS_REF_START")"
@@ -462,6 +490,8 @@ print_init_harness_summary() {
   case "${HARNESS_SELECTED_SOURCE}" in
     AGENTS.md) printf '  Found existing AGENTS.md\n' ;;
     agents.md) printf '  Found existing agents.md\n' ;;
+    CLAUDE.md) printf '  Found existing CLAUDE.md\n' ;;
+    claude.md) printf '  Found existing claude.md\n' ;;
     created) printf '  Created AGENTS.md\n' ;;
     *) printf '  %s\n' "${HARNESS_SELECTED_SOURCE:-unknown}" ;;
   esac
@@ -469,12 +499,20 @@ print_init_harness_summary() {
     printf '  %s\n' "$HARNESS_SUMMARY_REF"
   fi
   printf 'Claude:\n'
-  if [[ "${HARNESS_CLAUDE_DETECTED}" -eq 1 ]]; then
-    printf '  Found CLAUDE.md\n'
-    printf '  Left unchanged\n'
-  else
-    printf '  Not present\n'
-  fi
+  case "${HARNESS_SELECTED_SOURCE}" in
+    CLAUDE.md|claude.md)
+      printf '  Used as agent entrypoint\n'
+      printf '  Compact Blueprint block reconciled (user content preserved)\n'
+      ;;
+    *)
+      if [[ "${HARNESS_CLAUDE_DETECTED}" -eq 1 ]]; then
+        printf '  Found CLAUDE.md / claude.md\n'
+        printf '  Left unchanged (higher-priority agents file selected)\n'
+      else
+        printf '  Not present\n'
+      fi
+      ;;
+  esac
   local w
   if ((${#HARNESS_WARNINGS[@]} > 0)); then
     for w in "${HARNESS_WARNINGS[@]}"; do
@@ -502,6 +540,7 @@ print_update_harness_summary() {
   printf '  HARNESS.md\n'
   if [[ "$updated_runtimes" -eq 1 ]]; then
     printf '  managed runtime projections (.cursor / .claude)\n'
+    printf '  rename cleanup + full skill/rule refresh (harness/migrations/renames.log)\n'
     printf '  managed .gitignore section\n'
     printf '  .agent-blueprint.yaml version\n'
   else
@@ -523,5 +562,15 @@ print_update_harness_summary() {
   fi
   if harness_exact_exists "$root" "CLAUDE.md"; then
     printf '  CLAUDE.md\n'
+  fi
+  if harness_exact_exists "$root" "claude.md"; then
+    local claude_p claude_lower_p
+    claude_p="$(harness_exact_path "$root" "CLAUDE.md" 2>/dev/null || true)"
+    claude_lower_p="$(harness_exact_path "$root" "claude.md" 2>/dev/null || true)"
+    if [[ -n "$claude_lower_p" && "$claude_lower_p" != "$claude_p" ]]; then
+      printf '  claude.md\n'
+    elif [[ -z "$claude_p" && -n "$claude_lower_p" ]]; then
+      printf '  claude.md\n'
+    fi
   fi
 }

@@ -14,8 +14,8 @@ Package sources live under `harness/` and `templates/`. After `./blueprint insta
    ```
 
 3. **Reset task-scoped templates exactly** (copy bodies verbatim; do not delete files). Use the active runtime skill path:
-   - `<runtime>/skills/planning-execution-tracking/templates.md` → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
-   - `<runtime>/skills/memory-system-protocol/templates.md` → `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md`
+   - `<runtime>/skills/task-execution/templates.md` → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
+   - `<runtime>/skills/context-recall/templates.md` → `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md`
    - Runtime root is `.cursor` or `.claude` depending on the agent
    - Package equivalents: `harness/skills/*/templates.md` and `templates/memory/`
    - Never reset items listed under **Do not reset** inside the memory templates (for example installed skill trees, `ARCHITECTURE.md`).
@@ -39,15 +39,15 @@ Templates from two skills recreate **six** Markdown trackers at the **adopting**
 | When | Repo-root trackers | Count |
 | --- | --- | --- |
 | After **`/start`** | `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`, `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md` | **6** |
-| Optional stable layer | Add `ARCHITECTURE.md` when you maintain system design; **`/start` must not reset it** (see [harness/skills/memory-system-protocol/templates.md](../harness/skills/memory-system-protocol/templates.md) **Do not reset**). | **up to 7** |
+| Optional stable layer | Add `ARCHITECTURE.md` when you maintain system design; **`/start` must not reset it** (see [harness/skills/context-recall/templates.md](../harness/skills/context-recall/templates.md) **Do not reset**). | **up to 7** |
 | During **delivery batches** | Same files updated in place (checkboxes in `PLANNING`, rows in `DECISIONS`/`RUN_LOG`, scratch edits in `HOTCACHE`). | — |
 
 ## Bundled skills (under `harness/skills/`)
 
 | Folder | Typical trigger |
 | --- | --- |
-| `memory-system-protocol/` | Layered memory read/update; `/start` templates for `HOTCACHE`, `ANTI-PATTERNS`, `LEARNING`. |
-| `planning-execution-tracking/` | Tasks from `PLANNING`; `/start` templates for `PLANNING`, `DECISIONS`, `RUN_LOG`. |
+| `context-recall/` | Layered memory read/update; `/start` templates for `HOTCACHE`, `ANTI-PATTERNS`, `LEARNING`. |
+| `task-execution/` | Tasks from `PLANNING`; `/start` templates for `PLANNING`, `DECISIONS`, `RUN_LOG`. |
 | `refactor-code/` | Refactors; human applies risky edits (`disable-model-invocation`). |
 | `docs-style/` | README/doc IA refactors (`disable-model-invocation`). |
 | `skill-creator/` | Creating or iterating new skills under the active runtime `skills/<name>/`. |

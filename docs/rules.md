@@ -12,9 +12,9 @@ Shared defaults live under `harness/rules/`. After install:
 - Cursor: `.cursor/rules/*.mdc`
 - Claude Code: `.claude/rules/*.md` (same content; Cursor-only frontmatter keys are ignored)
 
-## `planning-execution-tracking`
+## `task-execution`
 
-Thin shim that points agents to the **planning-execution-tracking** skill: after each coded batch ensure `PLANNING.md` stays truthful, append `DECISIONS.md`, and rotate `RUN_LOG.md` telemetry with retention enforced.
+Thin shim that points agents to the **task-execution** skill: after each coded batch ensure `PLANNING.md` stays truthful, append `DECISIONS.md`, and rotate `RUN_LOG.md` telemetry with retention enforced.
 
 ## `safety-rules`
 

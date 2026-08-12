@@ -1,9 +1,9 @@
 ---
-name: memory-system-protocol
+name: context-recall
 description: Maintain layered AI engineering memory across planning, telemetry, decisions, architecture, hot cache, learning, anti-patterns, and curated skills. Use when executing work from memory files or when the user mentions PLANNING.md, RUN_LOG.md, ARCHITECTURE.md, DECISIONS.md, HOTCACHE.md, LEARNING.md, ANTI-PATTERNS.md, or skills.
 ---
 
-# AI Engineering Memory System Protocol
+# Context Recall
 
 You are operating inside an AI-assisted engineering workflow with layered memory and execution systems.
 
@@ -33,7 +33,7 @@ Each layer has different retention and retrieval behavior.
 
 Source of truth for active tasks, goals, status, and priorities. Execute work from this file.
 
-For checklist workflow, `## ✅ Done`, and task updates, use the **planning-execution-tracking** skill. For `PLANNING.md` copy-paste body on `/start`, see [planning-execution-tracking/templates.md](../planning-execution-tracking/templates.md).
+For checklist workflow, `## ✅ Done`, and task updates, use the **task-execution** skill. For `PLANNING.md` copy-paste body on `/start`, see [task-execution/templates.md](../task-execution/templates.md).
 
 ---
 
@@ -41,7 +41,7 @@ For checklist workflow, `## ✅ Done`, and task updates, use the **planning-exec
 
 Execution telemetry only (timestamps, scope, files, tests, status, errors). Not reflections or lessons.
 
-For table format, example rows, workflow, and row defaults, use the **planning-execution-tracking** skill and its [templates.md](../planning-execution-tracking/templates.md).
+For table format, example rows, workflow, and row defaults, use the **task-execution** skill and its [templates.md](../task-execution/templates.md).
 
 ---
 
@@ -64,7 +64,7 @@ Update only when architectural understanding changes.
 
 Engineering tradeoffs, rationale, rejected alternatives — not raw logs. Focus on why and consequences.
 
-For append format and updates during execution, use the **planning-execution-tracking** skill and [templates.md](../planning-execution-tracking/templates.md) (`## DECISIONS entry format`).
+For append format and updates during execution, use the **task-execution** skill and [templates.md](../task-execution/templates.md) (`## DECISIONS entry format`).
 
 ---
 
@@ -293,7 +293,7 @@ Reasoned engineering tradeoffs.
 When resetting files for a new task (`/start`):
 
 - [templates.md](templates.md) → `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md`
-- [planning-execution-tracking/templates.md](../planning-execution-tracking/templates.md) → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
+- [task-execution/templates.md](../task-execution/templates.md) → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
 
 Do not reset files listed under **Do not reset** in [templates.md](templates.md).
 
