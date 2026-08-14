@@ -9,6 +9,7 @@ HOTCACHE.md
 LEARNING.md
 ANTI-PATTERNS.md
 *.blueprint-conflict
+*.blueprint-backup.*
 .agent-blueprint.local.yaml
 .agent-blueprint/
 AGENTS.local.md

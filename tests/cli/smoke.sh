@@ -31,6 +31,17 @@ assert_file() {
   fi
 }
 
+assert_not_file() {
+  local label="$1" path="$2"
+  if [[ ! -f "$path" ]]; then
+    echo "  PASS  $label"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL  $label (unexpected file $path)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 assert_dir() {
   local label="$1" path="$2"
   if [[ -d "$path" ]]; then
@@ -119,7 +130,36 @@ assert_file "conflict sibling" "$TMP/.cursor/commands/start.md.blueprint-conflic
 content="$(cat "$TMP/.cursor/commands/start.md")"
 assert_eq "local start preserved" "$content" "local start"
 assert_contains "conflict message" "$out" "Conflict:"
+assert_contains "project conflict warning" "$out" "has "
+assert_contains "project conflict warning count" "$out" "conflict"
+assert_contains "summary Conflict line" "$out" "Conflict"
 
+echo "== conflict --force =="
+printf 'local start force\n' > "$TMP/.cursor/commands/start.md"
+# Stale sibling from a prior conflict must be cleared by a successful force write.
+printf 'stale package copy\n' > "$TMP/.cursor/commands/start.md.blueprint-conflict"
+out="$(CI=1 NO_COLOR=1 "$BP" install default --runtime cursor --target "$TMP" --force 2>&1)"
+assert_not_file "no conflict sibling after force" "$TMP/.cursor/commands/start.md.blueprint-conflict"
+content="$(cat "$TMP/.cursor/commands/start.md")"
+assert_contains "force overwrote local" "$content" "managed-by: shared-agent-blueprints"
+if [[ "$content" == "local start force" ]]; then
+  echo "  FAIL  force should not leave local-only content"
+  FAIL=$((FAIL + 1))
+else
+  echo "  PASS  force replaced local content"
+  PASS=$((PASS + 1))
+fi
+assert_contains "force cleared stale sibling msg" "$out" "removed stale conflict sibling"
+
+echo "== doctor reports conflicts =="
+printf 'local again\n' > "$TMP/.cursor/commands/review.md"
+CI=1 NO_COLOR=1 "$BP" install default --runtime cursor --target "$TMP" >/dev/null 2>&1
+assert_file "review conflict sibling" "$TMP/.cursor/commands/review.md.blueprint-conflict"
+out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$TMP" 2>&1)"
+assert_contains "doctor conflict warning" "$out" "unresolved *.blueprint-conflict"
+# Clean sibling so later assertions are not polluted.
+rm -f "$TMP/.cursor/commands/"*.blueprint-conflict
+# Restore managed review from package on next sync path if needed.
 echo "== agent files preserved on install =="
 printf 'user agents\n' > "$TMP/AGENTS.md"
 before_agents="$(cat "$TMP/AGENTS.md")"
@@ -144,6 +184,10 @@ echo "== monochrome / non-TTY symbols =="
 out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$ROOT" 2>&1)"
 assert_contains "doctor package mode" "$out" "package-source"
 assert_contains "lib modules checked" "$out" "lib/blueprint"
+assert_contains "skill naming ok" "$out" "package skills match naming standard"
+assert_file "generate-test-cases skill" "$ROOT/harness/skills/generate-test-cases/SKILL.md"
+assert_contains "generate-test-cases name" "$(head -5 "$ROOT/harness/skills/generate-test-cases/SKILL.md")" "name: generate-test-cases"
+assert_contains "renames log has testcase rename" "$(cat "$ROOT/harness/migrations/renames.log")" "testcase-generator"
 
 echo "== history written =="
 hist="${XDG_DATA_HOME}/blueprint/history.jsonl"
@@ -272,7 +316,67 @@ assert_not_contains "managed gitignore gone" "$(cat "$del_t/.gitignore" 2>/dev/n
 help_out="$(CI=1 NO_COLOR=1 "$BP" help 2>&1)"
 assert_contains "help lists del" "$help_out" "del"
 assert_contains "help keyword note" "$help_out" "keyword only"
+assert_contains "help lists install-contributor" "$help_out" "install-contributor"
+assert_contains "help force example" "$help_out" "update --force --target"
+assert_contains "help menu force note" "$help_out" 'Typing "update --force" in the'
+assert_contains "help lists clean" "$help_out" "clean"
+assert_contains "help clean example" "$help_out" "clean --force --target"
 rm -rf "$del_t"
+
+echo "== clean backups =="
+clean_t="${TMP}-clean"
+rm -rf "$clean_t"
+mkdir -p "$clean_t/.cursor/commands"
+CI=1 NO_COLOR=1 "$BP" init --target "$clean_t" >/dev/null 2>&1
+CI=1 NO_COLOR=1 "$BP" install default --runtime cursor --target "$clean_t" >/dev/null 2>&1
+printf 'old local\n' > "$clean_t/.cursor/commands/start.md.blueprint-backup.20260813T000000Z"
+printf 'old local2\n' > "$clean_t/.cursor/commands/review.md.blueprint-backup.20260813T000000Z"
+bak_n="$(find "$clean_t" -name '*.blueprint-backup.*' -type f | wc -l | tr -d ' ')"
+assert_eq "backup count before clean" "$bak_n" "2"
+set +e
+out="$(CI=1 NO_COLOR=1 "$BP" clean --target "$clean_t" 2>&1)"
+rc=$?
+set -e
+assert_eq "clean without --force fails in CI" "$rc" "1"
+assert_contains "clean needs force" "$out" "--force"
+assert_file "backup still present without force" "$clean_t/.cursor/commands/start.md.blueprint-backup.20260813T000000Z"
+out="$(CI=1 NO_COLOR=1 "$BP" clean --force --target "$clean_t" 2>&1)"
+assert_not_file "backup removed by clean" "$clean_t/.cursor/commands/start.md.blueprint-backup.20260813T000000Z"
+assert_not_file "second backup removed" "$clean_t/.cursor/commands/review.md.blueprint-backup.20260813T000000Z"
+assert_contains "clean deleted count" "$out" "deleted 2 backup"
+out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$clean_t" 2>&1)"
+assert_contains "doctor no backups" "$out" "no *.blueprint-backup.* leftovers"
+rm -rf "$clean_t"
+
+echo "== install-contributor =="
+set +e
+out="$(CI=1 NO_COLOR=1 "$BP" install-contributor --runtime cursor --target "$TMP" 2>&1)"
+rc=$?
+set -e
+assert_eq "install-contributor rejects consumer target" "$rc" "1"
+assert_contains "install-contributor package-only msg" "$out" "only runs against the package root"
+assert_eq "consumer has no contributor-standards" \
+  "$([[ -f "$TMP/.cursor/rules/contributor-standards.mdc" ]] && echo yes || echo no)" "no"
+
+# Project into package root (gitignored), verify doctor, then clean up.
+rm -rf "${ROOT}/.cursor" "${ROOT}/.claude"
+rm -f "${ROOT}/.agent-blueprint.local.yaml"
+out="$(CI=1 NO_COLOR=1 "$BP" install-contributor --runtime cursor --target "$ROOT" 2>&1)"
+assert_contains "install-contributor completed" "$out" "Blueprint synchronization completed"
+assert_file "contributor commit command" "$ROOT/.cursor/commands/commit.md"
+assert_file "contributor pr command" "$ROOT/.cursor/commands/pr.md"
+assert_file "contributor standards rule" "$ROOT/.cursor/rules/contributor-standards.mdc"
+assert_file "skill-creator projected" "$ROOT/.cursor/skills/skill-creator/SKILL.md"
+assert_file "contributor local marker" "$ROOT/.agent-blueprint.local.yaml"
+assert_contains "marker profile" "$(cat "$ROOT/.agent-blueprint.local.yaml")" "package-contributor"
+assert_contains "contributor commit no jira" "$(cat "$ROOT/.cursor/commands/commit.md")" "No JIRA"
+out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$ROOT" 2>&1)"
+assert_contains "doctor healthy with contributor runtime" "$out" "Healthy"
+assert_contains "doctor allows local cursor" "$out" "package-contributor local runtime"
+rm -rf "${ROOT}/.cursor" "${ROOT}/.claude"
+rm -f "${ROOT}/.agent-blueprint.local.yaml"
+out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$ROOT" 2>&1)"
+assert_contains "doctor healthy after contributor cleanup" "$out" "Healthy"
 
 echo
 echo "Results: ${PASS} passed, ${FAIL} failed"

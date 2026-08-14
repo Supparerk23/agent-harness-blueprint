@@ -51,6 +51,14 @@ Vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponyta
 
 **Required with `refactor-code`:** invoking `/refactor-code` must also enable `/ponytail` for that session.
 
+## `generate-test-cases`
+
+**Intent:** Senior-QA playbook that analyzes a software change (JIRA / branch / PR / `PLANNING.md`) and writes a Testiny-importable CSV (`testcases-<JIRA>.csv`). Ships with `disable-model-invocation` — invoke explicitly (`/generate-test-cases`). Schema and column rules live in the skill markdown (no bundled CSV). Opt-in only; never auto-run for ordinary coding work.
+
+## `update-api-docs`
+
+**Intent:** Keep FastAPI OpenAPI YAML (`docs/api/openapi.yaml`) and response example JSON files in sync with `app/routers/`. Prefer re-export via `app.openapi()`; fall back to manual path/schema/example edits. Use when adding, removing, or changing API endpoints, refreshing swagger/OpenAPI, or updating response examples.
+
 ## `skill-creator`
 
 **Intent:** Meta-playbook for authoring new skills:

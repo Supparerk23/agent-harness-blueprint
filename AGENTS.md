@@ -20,6 +20,19 @@ Consumers use the CLI (never copy package-root docs as the product contract):
 
 See [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [docs/](docs/).
 
+## Contributor harness (package source only)
+
+Standards for contributors and agents working **on this package**. Unrelated to consumer/target harness installs under `harness/` / `blueprints/`.
+
+| Playbook | Path |
+|---|---|
+| Commits (no JIRA) | [contributor/commands/commit.md](contributor/commands/commit.md) |
+| PRs + release notes | [contributor/commands/pr.md](contributor/commands/pr.md) |
+| Always-on standards | [contributor/rules/contributor-standards.mdc](contributor/rules/contributor-standards.mdc) |
+
+- Before adding or substantially rewriting a skill under `harness/skills/`, read and follow [harness/skills/skill-creator/SKILL.md](harness/skills/skill-creator/SKILL.md) and [docs/standards/skill-naming.md](docs/standards/skill-naming.md).
+- Optional local slash commands: `./blueprint install-contributor --runtime all` (gitignored `.cursor` / `.claude`; see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## Package edit order
 
 1. This file / [CLAUDE.md](CLAUDE.md) for package orientation
@@ -33,3 +46,4 @@ See [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [docs/](docs
 - Commit consumer artifacts (`.cursor/`, `.claude/`, `PLANNING.md`, etc.) into this package
 - Point product repos at this package-root `AGENTS.md` as their runtime contract
 - Treat optional overlays (e.g. GitLab) as universal defaults
+- Project `contributor/` into consumer/target installs

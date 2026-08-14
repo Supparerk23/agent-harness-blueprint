@@ -45,6 +45,7 @@ Narrative docs for this shared agent blueprint package. Start from the root [REA
 | [SECURITY.md](../SECURITY.md) | Vulnerability reporting |
 | [CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog release notes |
 | [github-labels.md](github-labels.md) | Recommended GitHub labels |
+| [standards/skill-naming.md](standards/skill-naming.md) | Canonical Skill naming (`<action>-<object>[-<context>]`) |
 
 ## CLI
 

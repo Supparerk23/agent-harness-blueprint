@@ -1,0 +1,31 @@
+---
+description: Package-contributor standards for shared-agent-blueprints source work (not consumer harness).
+alwaysApply: true
+---
+
+# Contributor standards (package source only)
+
+These rules apply when editing **this** blueprint package. They do **not** apply to consumer/target project harness installs.
+
+## Skill creation gate
+
+Before adding a new skill under `harness/skills/` (or substantially rewriting an existing package skill):
+
+1. Read and follow `harness/skills/skill-creator/SKILL.md`.
+2. Pass the Skill naming standard in `docs/standards/skill-naming.md` (`<action>-<object>[-<context>]`; no roles/models/versions/redundant suffixes).
+3. Use skill-creator to draft structure, description (triggering), and content.
+4. Register the skill in package inventories (`package_skill_names`, `manifest.yaml`, docs) only after the skill draft meets project standards.
+5. On rename: append a row to `harness/migrations/renames.log` and update all inventories.
+
+Do not drop ad-hoc `SKILL.md` trees into `harness/skills/` without going through skill-creator.
+
+## Commits and PRs
+
+- Commits: follow `contributor/commands/commit.md` — conventional `type(scope): description`, **no JIRA number**.
+- Pull requests: follow `contributor/commands/pr.md` — GitHub `gh`, include short **Release notes** for `CHANGELOG.md` `[Unreleased]`.
+
+## Separation from consumer harness
+
+- Do not treat `contributor/` as content to project into consumer apps.
+- Do not commit live `.cursor/` / `.claude/` trees or task-memory files into this package.
+- Consumer playbooks under `harness/` and forge overlays under `blueprints/` remain for target installs only.

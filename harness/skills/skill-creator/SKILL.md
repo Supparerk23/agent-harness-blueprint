@@ -62,9 +62,19 @@ Check available MCPs - if useful for research (searching docs, finding similar s
 
 ### Write the SKILL.md
 
+Before choosing a `name`, apply the **Skill naming gate** (required for this package):
+
+1. Read and follow [`docs/standards/skill-naming.md`](../../../docs/standards/skill-naming.md).
+2. Format MUST be `<action>-<object>[-<context>]` (lowercase, hyphens only).
+3. MUST NOT encode Agent role, model/provider, client/runtime, version, or redundant suffixes (`-skill`, `-agent`, …).
+4. Directory name MUST match frontmatter `name`.
+5. Prefer action-first names (`generate-test-cases`, not `testcase-generator`).
+
+Reject or rename proposed names that fail the quality gate in that doc before drafting the body.
+
 Based on the user interview, fill in these components:
 
-- **name**: Skill identifier
+- **name**: Skill identifier (must pass the naming standard above)
 - **description**: When to trigger, what it does. This is the primary triggering mechanism - include both what the skill does AND specific contexts for when to use it. All "when to use" info goes here, not in the body. Note: currently Claude has a tendency to "undertrigger" skills -- to not use them when they'd be useful. To combat this, please make the skill descriptions a little bit "pushy". So for instance, instead of "How to build a simple fast dashboard to display internal Anthropic data.", you might write "How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
 - **the rest of the skill :)**

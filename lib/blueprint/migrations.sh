@@ -19,7 +19,9 @@ package_skill_names() {
     ponytail-audit \
     ponytail-debt \
     ponytail-gain \
-    ponytail-help
+    ponytail-help \
+    generate-test-cases \
+    update-api-docs
 }
 
 package_rule_names() {
@@ -142,4 +144,73 @@ refresh_package_rules_into() {
     fi
     copy_file "${PACKAGE_ROOT}/harness/rules/${src_rule}" "${dest_rules}/${dest_name}" force
   done < <(package_rule_names)
+}
+
+# Grandfathered identities that may violate action-first naming (vendored / protocol).
+package_skill_naming_grandfathered() {
+  case "$1" in
+    skill-creator|context-recall|task-execution|docs-style|i-have-adhd|ponytail|ponytail-review|ponytail-audit|ponytail-debt|ponytail-gain|ponytail-help)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# validate_package_skill_naming
+# Prints problems to stdout (one per line). Exit 0 if clean, 1 if any issues.
+# Checks: lowercase hyphen form, dir exists, frontmatter name matches dir,
+# forbidden suffixes / role-model-version tokens (new skills only).
+validate_package_skill_naming() {
+  local skill skill_dir fm_name problems=0 line
+  while IFS= read -r skill; do
+    [[ -z "$skill" ]] && continue
+    skill_dir="${PACKAGE_ROOT}/harness/skills/${skill}"
+    if [[ ! -d "$skill_dir" ]]; then
+      printf 'missing skill directory: %s\n' "$skill"
+      problems=$((problems + 1))
+      continue
+    fi
+    if [[ ! -f "${skill_dir}/SKILL.md" ]]; then
+      printf 'missing SKILL.md: %s\n' "$skill"
+      problems=$((problems + 1))
+      continue
+    fi
+    if [[ ! "$skill" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+      printf 'invalid skill name (use lowercase hyphen segments): %s\n' "$skill"
+      problems=$((problems + 1))
+    fi
+    fm_name="$(sed -n 's/^name:[[:space:]]*//p' "${skill_dir}/SKILL.md" | head -1 | tr -d '\r' | sed -e 's/^["'\'']//' -e 's/["'\'']$//')"
+    if [[ -z "$fm_name" ]]; then
+      printf 'missing frontmatter name: %s\n' "$skill"
+      problems=$((problems + 1))
+    elif [[ "$fm_name" != "$skill" ]]; then
+      printf 'frontmatter name mismatch: dir=%s name=%s\n' "$skill" "$fm_name"
+      problems=$((problems + 1))
+    fi
+    case "$skill" in
+      *-skill|*-agent|*-assistant|*-tool|*-service)
+        printf 'forbidden suffix in skill name: %s\n' "$skill"
+        problems=$((problems + 1))
+        ;;
+    esac
+    if package_skill_naming_grandfathered "$skill"; then
+      continue
+    fi
+    # Non-grandfathered: reject role/model/version tokens and non-action-first object-verb forms.
+    if [[ "$skill" =~ (^|-)(gpt|claude|gemini|cursor|copilot|llm|v[0-9]+|beta|legacy)(-|$) ]]; then
+      printf 'forbidden role/model/version token in skill name: %s\n' "$skill"
+      problems=$((problems + 1))
+    fi
+    if [[ "$skill" =~ (engineer|senior-qa|^qa-) ]]; then
+      printf 'forbidden role token in skill name: %s\n' "$skill"
+      problems=$((problems + 1))
+    fi
+  done < <(package_skill_names)
+
+  if [[ "$problems" -gt 0 ]]; then
+    return 1
+  fi
+  return 0
 }

@@ -130,6 +130,7 @@ Commands:
   (none) / menu        Interactive menu (TTY)
   init                 Write HARNESS.md + agent harness reference, memory, .gitignore
   install <blueprint>  Install blueprint into --target runtimes
+  install-contributor  Project package-only contributor harness (this package root)
   update               Version check, then refresh HARNESS.md + managed runtimes
   sync                 Re-apply installed blueprint with preserve-local
   del                  Remove blueprint from --target
@@ -149,6 +150,7 @@ Flags:
 |---|---|
 | `init` | `HARNESS.md`, agent harness reference, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
 | `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` |
+| `install-contributor` | Package-only: projects `contributor/` + `skill-creator` into gitignored local runtimes |
 | `update` | Version check vs package `VERSION`, refresh `HARNESS.md`, apply skill/rule renames, full-refresh managed skills/rules — never rewrites agent instruction files |
 | `sync` | Re-applies the installed blueprint (`preserve-local`); may fetch a remote `source` |
 | `del` | Removes managed blueprint + memory files; preserves agent instruction bodies |
@@ -223,7 +225,8 @@ Optionally delete the package checkout. `del` does not rewrite `AGENTS.md` / `CL
 | `doctor` fails on package | Run from the package root; ensure `VERSION`, `manifest.yaml`, and `harness/` are present |
 | `install` asks for runtime in CI | Pass `--runtime cursor\|claude\|all` explicitly |
 | Target must not be this package | Point `--target` at a **consumer** repo, not this checkout |
-| Conflicts (`*.blueprint-conflict`) | Compare sibling files; merge manually; re-run `sync` |
+| Conflicts (`*.blueprint-conflict`) | Compare sibling files; merge manually; re-run with `--force` to overwrite; interactive update/sync also prompts to apply package versions |
+| Leftover backups (`*.blueprint-backup.*`) | After review, `./blueprint clean --force --target …` (or menu `clean` / Known projects → `clean`). Status `*` means clean is needed |
 | Stale remote blueprint | `sync` again, or clear `$XDG_CACHE_HOME/blueprint/repos/` and retry |
 | Interrupted install/sync | Re-run the same command; resume state lives under consumer `.agent-blueprint/` |
 | Menu has no targets | Add a path when prompted; package-local `targets.json` is gitignored |
@@ -285,14 +288,15 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, bra
 
 ```text
 .
-├── harness/             # canonical commands, rules, skills
+├── harness/             # canonical commands, rules, skills (consumer)
+├── contributor/         # package-only commit/PR/skill standards
 ├── blueprints/          # default | engineering | startup
 ├── templates/           # entrypoints + memory + PRD/ADR
 ├── lib/blueprint/       # CLI terminal UX modules
 ├── prompts/             # prompt library
 ├── docs/                # diagrams + deep docs
 ├── tests/cli/           # CLI smoke tests
-├── blueprint            # CLI: init | install | sync | doctor | menu
+├── blueprint            # CLI: init | install | install-contributor | sync | doctor
 └── examples/consumer/   # example consumer install state
 ```
 

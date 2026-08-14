@@ -54,10 +54,14 @@ flowchart TD
   exists -->|no| write[Write + managed marker]
   exists -->|yes memory state| keep[Preserve local state]
   exists -->|yes managed marker| overwrite[Overwrite from package]
-  exists -->|yes unmanaged| conflict[Write *.blueprint-conflict]
+  exists -->|yes unmanaged| forceCheck{"--force?"}
+  forceCheck -->|no| conflict[Write *.blueprint-conflict]
+  forceCheck -->|yes| forceWrite[Overwrite local from package]
 ```
 
 Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) always win.
+
+On install/sync/update, unresolved conflicts emit a **project-level warning** (project name + count). In an interactive TTY, the CLI also offers to overwrite locals from the `*.blueprint-conflict` siblings. Non-interactive runs leave locals intact unless you pass `--force`. Known targets prefix the Name with compact status icons (`✓` current, `↓` outdated, `!` conflicts, `*` leftover backups — run `blueprint clean`), colored to match. `doctor` lists unresolved conflict siblings and backups as warnings.
 
 ## Update loop
 
@@ -68,5 +72,15 @@ Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) alw
 When consumer state `source` is a git URL, `sync` / `install` fetch or update a local cache (`$XDG_CACHE_HOME/blueprint/repos/`) before copying. Status symbols (`→` `✓` `!` `✗` `⊘` `~` `+`) stream per file; a final summary reports added / updated / skipped / failed counts and a run ID.
 
 Interrupted operations leave `.agent-blueprint/session.json` in the consumer. The next interactive `install` / `sync` offers resume; non-interactive runs start fresh unless `BLUEPRINT_RESUME=1`.
+
+## Package contributor harness
+
+Sources under `contributor/` standardize commits, PRs, and skill creation **for this package only**. They are **not** copied by consumer `blueprint install`. Optional local IDE projection:
+
+```bash
+./blueprint install-contributor --runtime all
+```
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) and package-root [AGENTS.md](../AGENTS.md).
 
 Details: [compatibility.md](compatibility.md), [slash-commands.md](slash-commands.md), [rules.md](rules.md), [skills.md](skills.md).

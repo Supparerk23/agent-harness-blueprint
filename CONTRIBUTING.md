@@ -40,11 +40,15 @@ Use lowercase kebab-case slugs. Prefer short, descriptive names over ticket-only
 
 ## Commit convention
 
-Prefer concise, imperative subjects (what / why), for example:
+Prefer concise, imperative conventional subjects (what / why), for example:
 
-- `fix add command resume path`
+- `fix(cli): add command resume path`
 - `docs: clarify install --runtime selector`
-- `feat: add doctor check for remote cache`
+- `feat(doctor): add check for remote cache`
+
+Format: `type(scope): description` with types `feat|fix|refactor|test|docs|chore`. **No JIRA number** in commit messages for this package.
+
+Agent playbook: [contributor/commands/commit.md](contributor/commands/commit.md).
 
 Keep commits focused. Do not commit consumer artifacts (`.cursor/`, `.claude/`, `PLANNING.md`, `targets.json`, etc.).
 
@@ -53,11 +57,28 @@ Keep commits focused. Do not commit consumer artifacts (`.cursor/`, `.claude/`, 
 1. Fork (or branch from the default branch) and make a focused change.
 2. Run the smoke and harness tests (see [Testing](#testing-requirements)).
 3. Open a PR using the template. Describe **why** the change exists and how you verified it.
-4. Link related issues when applicable.
-5. Keep the PR scoped — large mixed refactors are harder to review and more likely to be deferred.
-6. Address review feedback with follow-up commits (prefer not to force-push unless asked).
+4. Include short **Release notes** (1–3 Keep a Changelog bullets) suitable for `CHANGELOG.md` `[Unreleased]`.
+5. Link related issues when applicable.
+6. Keep the PR scoped — large mixed refactors are harder to review and more likely to be deferred.
+7. Address review feedback with follow-up commits (prefer not to force-push unless asked).
+
+Agent playbook: [contributor/commands/pr.md](contributor/commands/pr.md).
 
 Maintainers may ask for docs updates when CLI or projection behavior changes.
+
+## Contributor harness (local slash commands)
+
+Package-contributor standards live under [`contributor/`](contributor/) and are **not** projected by consumer `blueprint install`.
+
+To enable local `/commit`, `/pr`, and `skill-creator` in Cursor/Claude while working on this package:
+
+```bash
+./blueprint install-contributor --runtime all
+```
+
+This writes gitignored `.cursor/` / `.claude/` plus `.agent-blueprint.local.yaml` (`profile: package-contributor`). Do not commit those artifacts. `./blueprint doctor` allows them when the local marker is present.
+
+Before adding or substantially rewriting a skill under `harness/skills/`, follow [harness/skills/skill-creator/SKILL.md](harness/skills/skill-creator/SKILL.md) and the [Skill naming standard](docs/standards/skill-naming.md) (`<action>-<object>[-<context>]`).
 
 ## Coding style
 

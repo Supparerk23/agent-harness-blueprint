@@ -16,7 +16,7 @@ Create a merge request (MR) for the current branch. This repo uses **GitLab** â€
 # Merge Request
 
 ## Summary
-<!-- Max 1â€“2 lines. Do not include filenames. -->
+<!-- should define max of Line ? 1-2 Line , The filename must not be included in the summary. -->
 -
 -
 
@@ -24,14 +24,20 @@ Create a merge request (MR) for the current branch. This repo uses **GitLab** â€
 Areas that need special attention:
 -
 
+## Material Verification (Optional)
+<!-- Add only when this MR affects external/system materials such as DB migration, Pub/Sub, IAM, Storage, Config, etc. -->
+<!-- Describe what changed and how it was verified. -->
+-
+
 ## Testing
 - [ ] Unit Test
 - [ ] Manual Test
+- [ ] Testiny : <!-- Testiny Test Run URL -->
 
 ## Risk
-- [ ] Low / refactor
-- [ ] Medium / Add Business Logic (New Thing)
-- [ ] High / Breaking Change / Change Business Logic / Journey Change (FN/BN)
+- [ ] Low <!-- refector -->
+- [ ] Medium <!-- Add Business Logic ( New Thing ) -->
+- [ ] High <!-- Breaking Change / Change Business Logic / Jurney Change ( FN/BN ) -->
 
 ## Screenshots (Optional)
 <!-- UI changes -->
@@ -45,6 +51,8 @@ Summary rules:
 - **Do not** include filenames in the summary
 - Prefer outcome/intent over file lists
 - Mark the matching Risk checkbox; leave Testing checkboxes for the author/reviewer unless tests were already run
+- Fill **Material Verification** only when the MR touches external/system materials (DB migration, Pub/Sub, IAM, Storage, Config, etc.)
+- Add a Testiny test-run URL under Testing when available
 
 3. Run `ensure_glab` (see [prerequisite.md](prerequisite.md)).
 
@@ -71,7 +79,7 @@ Summary rules:
    # Merge Request
 
    ## Summary
-   <!-- Max 1â€“2 lines. Do not include filenames. -->
+   <!-- should define max of Line ? 1-2 Line , The filename must not be included in the summary. -->
    - <outcome line 1>
    - <outcome line 2 if needed>
 
@@ -79,14 +87,20 @@ Summary rules:
    Areas that need special attention:
    - <notes or leave blank>
 
+   ## Material Verification (Optional)
+   <!-- Add only when this MR affects external/system materials such as DB migration, Pub/Sub, IAM, Storage, Config, etc. -->
+   <!-- Describe what changed and how it was verified. -->
+   -
+
    ## Testing
    - [ ] Unit Test
    - [ ] Manual Test
+   - [ ] Testiny : <!-- Testiny Test Run URL -->
 
    ## Risk
-   - [ ] Low / refactor
-   - [ ] Medium / Add Business Logic (New Thing)
-   - [ ] High / Breaking Change / Change Business Logic / Journey Change (FN/BN)
+   - [ ] Low <!-- refector -->
+   - [ ] Medium <!-- Add Business Logic ( New Thing ) -->
+   - [ ] High <!-- Breaking Change / Change Business Logic / Jurney Change ( FN/BN ) -->
 
    ## Screenshots (Optional)
    <!-- UI changes -->

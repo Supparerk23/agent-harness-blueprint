@@ -47,6 +47,8 @@ harness:
     - ponytail-debt
     - ponytail-gain
     - ponytail-help
+    - generate-test-cases
+    - update-api-docs
 
 agents:
   entrypoint: AGENTS.md

@@ -45,6 +45,91 @@ targets_count() {
   printf '%s' "$n"
 }
 
+# Count unresolved *.blueprint-conflict siblings under consumer runtimes.
+target_conflict_count() {
+  local root="$1"
+  local n=0
+  local rt c
+  for rt in .cursor .claude; do
+    if [[ -d "${root}/${rt}" ]]; then
+      c="$(find "${root}/${rt}" -name '*.blueprint-conflict' -type f 2>/dev/null | wc -l | tr -d ' ')"
+      if [[ "$c" =~ ^[0-9]+$ ]]; then
+        n=$((n + c))
+      fi
+    fi
+  done
+  printf '%s' "$n"
+}
+
+# List unresolved conflict sibling paths (one per line).
+target_conflict_list() {
+  local root="$1"
+  local rt
+  for rt in .cursor .claude; do
+    if [[ -d "${root}/${rt}" ]]; then
+      find "${root}/${rt}" -name '*.blueprint-conflict' -type f 2>/dev/null | sort
+    fi
+  done
+}
+
+# Count overwrite backups (*.blueprint-backup.*) under runtimes + project root.
+target_backup_count() {
+  local root="$1"
+  local n=0
+  local rt c
+  for rt in .cursor .claude; do
+    if [[ -d "${root}/${rt}" ]]; then
+      c="$(find "${root}/${rt}" -name '*.blueprint-backup.*' -type f 2>/dev/null | wc -l | tr -d ' ')"
+      if [[ "$c" =~ ^[0-9]+$ ]]; then
+        n=$((n + c))
+      fi
+    fi
+  done
+  if [[ -d "$root" ]]; then
+    c="$(find "$root" -maxdepth 1 -name '*.blueprint-backup.*' -type f 2>/dev/null | wc -l | tr -d ' ')"
+    if [[ "$c" =~ ^[0-9]+$ ]]; then
+      n=$((n + c))
+    fi
+  fi
+  printf '%s' "$n"
+}
+
+# List overwrite backup paths (one per line).
+target_backup_list() {
+  local root="$1"
+  local rt
+  {
+    for rt in .cursor .claude; do
+      if [[ -d "${root}/${rt}" ]]; then
+        find "${root}/${rt}" -name '*.blueprint-backup.*' -type f 2>/dev/null
+      fi
+    done
+    if [[ -d "$root" ]]; then
+      find "$root" -maxdepth 1 -name '*.blueprint-backup.*' -type f 2>/dev/null
+    fi
+  } | sort -u
+}
+
+# Delete overwrite backups under a consumer target. Prints deleted count to stdout.
+# Usage: target_clean_backups <root> [dry_run=0]
+target_clean_backups() {
+  local root="$1"
+  local dry="${2:-0}"
+  local path deleted=0
+  while IFS= read -r path || [[ -n "$path" ]]; do
+    [[ -n "$path" ]] || continue
+    [[ -f "$path" ]] || continue
+    if [[ "$dry" -eq 1 ]]; then
+      deleted=$((deleted + 1))
+      continue
+    fi
+    if rm -f "$path"; then
+      deleted=$((deleted + 1))
+    fi
+  done < <(target_backup_list "$root")
+  printf '%s' "$deleted"
+}
+
 # Resolve blueprint version for a consumer path (state file, else package).
 targets_version_for_path() {
   local abs_path="$1"
