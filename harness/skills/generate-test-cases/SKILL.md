@@ -122,7 +122,7 @@ Before export, ensure every important requirement, acceptance criterion, busines
 Use this exact header (column names and order). Do not add, rename, or reorder columns unless the user supplied a different template file.
 
 ```text
-Folder,Component,Platform,Features,Sub-Features,TC#,Summary,Test Data,Pre-condition,Test Steps,Expected Result,Jira,Sprint,Regression,Priority,Automation status,Active?,Test Result,Test By,Test Date,Remark
+Folder,Platform,Features,Sub-Features,Section,TC#,Summary,Test Data,Pre-condition,Test Steps,Expected Result,Jira,Sprint,Regression,Priority,Automation status,Active?,Test Result,Test By,Test Date,Remark
 ```
 
 ### Column fill rules
@@ -130,10 +130,10 @@ Folder,Component,Platform,Features,Sub-Features,TC#,Summary,Test Data,Pre-condit
 | Column | Guidance |
 |---|---|
 | Folder | Hierarchical path; nest with ` > ` (example shape: `folder > sub folder1 > sub folder2`) |
-| Component | Component under test when known; else empty |
 | Platform | Project-known platform values only (multi-select style). Do not invent platforms |
 | Features | Feature name for the change |
 | Sub-Features | Finer slice when useful; else empty |
+| Section | Grouping label for the suite slice (example values: `API`, `ui`). Infer from folder/platform when possible |
 | TC# | Prefer leave empty for import (Testiny does not store this as a durable id). Do not invent fake ids |
 | Summary | Clear, unique case title |
 | Test Data | Inputs/fixtures needed; multiline OK |
@@ -141,11 +141,11 @@ Folder,Component,Platform,Features,Sub-Features,TC#,Summary,Test Data,Pre-condit
 | Test Steps | Numbered multiline steps (`1. …` then newline `2. …`). Quote the field so newlines survive |
 | Expected Result | Numbered multiline outcomes aligned with steps. Quote for newlines |
 | Jira | Resolved ticket id (e.g. `FIN-123`). Never invent |
-| Sprint | Period string when known (example shape: `2026-11`); ask or leave empty if unknown |
+| Sprint | Period string when known (example shape: `2026-17`); ask or leave empty if unknown |
 | Regression | Use project convention; example value `Yes` when the case is regression-relevant |
-| Priority | Prefer labels already used in the project (example shape: `Critical`) |
+| Priority | Prefer labels already used in the project (example values: `High`, `Medium`) |
 | Automation status | Multi-select style; default `Manual` when unknown |
-| Active? | Boolean; use `TRUE` for new active cases |
+| Active? | Boolean; use `True` for new active cases |
 | Test Result | Leave empty for newly generated suites unless the user asks to fill execution results |
 | Test By | Leave empty unless the user asks |
 | Test Date | Leave empty unless the user asks |
@@ -159,16 +159,30 @@ These types describe how Testiny treats related fields. They guide **values**, n
 |---|---|---|
 | Automation status | Multi-Select | |
 | Remark | Multi-Line Text | |
-| Priority | Number (integer) in Testiny config; import examples often use text labels like `Critical` — prefer values the project already uses |
+| Priority | Number (integer) in Testiny config; import examples often use text labels like `High` — prefer values the project already uses |
 | Type | Text | Not a separate import column in the canonical header; omit unless present in a user-supplied template |
 | Sprint | Text | |
 | Jira | Text | |
 | Platform | Multi-Select | Use only known platform values |
 | Test Data | Multi-Line Text | |
-| Section | Text | Not a separate import column in the canonical header |
+| Section | Text | Canonical import column; grouping label for the suite slice |
 | Sub-Features | Text | |
 | Regression | Multi-Select | |
-| Active | Boolean | Import column name is `Active?` |
+| Active | Boolean | Import column name is `Active?`; value `True` |
+
+### Formatting example
+
+Treat the rows below as **formatting only**, not as required content. Do not copy product names, URLs, or ticket ids from any user-supplied import file.
+
+```csv
+Folder,Platform,Features,Sub-Features,Section,TC#,Summary,Test Data,Pre-condition,Test Steps,Expected Result,Jira,Sprint,Regression,Priority,Automation status,Active?,Test Result,Test By,Test Date,Remark
+Product > Feature > API,API,Feature,GET Resource,API,,Returns resource for valid id,,1. service available,"1. send GET request
+2. verify response","1. response status 200
+2. body contains the resource",FIN-123,2026-17,Yes,High,Manual,True,,,,
+Product > Feature > UI,Web,Feature,UI Resource,ui,,Displays resource on detail page,,"1. login
+2. open the feature","1. open the detail page
+2. verify displayed content",1. page shows the expected resource,FIN-123,2026-17,Yes,High,Manual,True,,,,
+```
 
 ### CSV encoding
 

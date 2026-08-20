@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `generate-test-cases` canonical Testiny header now matches the live import (`Section` instead of `Component`; fill-rule examples for `Active?`, `Priority`, `Sprint`)
 - `--force` help text clarifies it overwrites unmanaged conflicting runtime files (not only `del`)
 - Success summary prints an explicit Conflict count when conflicts occurred
 
