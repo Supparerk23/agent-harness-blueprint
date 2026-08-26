@@ -96,6 +96,8 @@ out="$(CI=1 NO_COLOR=1 "$BP" init --target "$TMP" 2>&1)"
 assert_file "AGENTS.md written" "$TMP/AGENTS.md"
 assert_file "HARNESS.md written" "$TMP/HARNESS.md"
 assert_file "state written" "$TMP/.agent-blueprint.yaml"
+assert_contains "gitignore ignores .agents/" "$(cat "$TMP/.gitignore")" $'.agents/'
+assert_contains "gitignore ignores .testiny/" "$(cat "$TMP/.gitignore")" $'.testiny/'
 assert_contains "init summary" "$out" "Blueprint synchronization completed"
 assert_contains "init harness banner" "$out" "Blueprint initialized"
 assert_contains "managed harness markers" "$(cat "$TMP/AGENTS.md")" "<!-- BLUEPRINT:HARNESS:START -->"

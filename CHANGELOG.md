@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `/commit` only commits and pushes; it no longer opens a PR/MR (use `/pr`)
+- `generate-test-cases` always writes CSV under `.testiny/` (gitignored); no Downloads prompt
 - `generate-test-cases` canonical Testiny header now matches the live import (`Section` instead of `Component`; fill-rule examples for `Active?`, `Priority`, `Sprint`)
 - `--force` help text clarifies it overwrites unmanaged conflicting runtime files (not only `del`)
 - Success summary prints an explicit Conflict count when conflicts occurred

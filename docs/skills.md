@@ -53,7 +53,7 @@ Vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponyta
 
 ## `generate-test-cases`
 
-**Intent:** Senior-QA playbook that analyzes a software change (JIRA / branch / PR / `PLANNING.md`) and writes a Testiny-importable CSV (`testcases-<JIRA>.csv`). Ships with `disable-model-invocation` — invoke explicitly (`/generate-test-cases`). Schema and column rules live in the skill markdown (no bundled CSV). Opt-in only; never auto-run for ordinary coding work.
+**Intent:** Senior-QA playbook that analyzes a software change (JIRA / branch / PR / `PLANNING.md`) and writes a Testiny-importable CSV to `.testiny/testcases-<JIRA>.csv` (gitignored). Ships with `disable-model-invocation` — invoke explicitly (`/generate-test-cases`). Schema and column rules live in the skill markdown (no bundled CSV). Opt-in only; never auto-run for ordinary coding work.
 
 ## `update-api-docs`
 

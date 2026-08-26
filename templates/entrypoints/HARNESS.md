@@ -71,7 +71,7 @@ Skills live under the active runtime (`<runtime>/skills/`). Prefer matching a sk
 | Reading or updating memory layers | `context-recall` | Use when memory files drive the session. |
 | Docs IA / README split | `docs-style` | Opt-in / explicit invoke. |
 | Creating or tuning a skill | `skill-creator` | Opt-in / explicit invoke. |
-| Generate Testiny QA CSV for a change | `generate-test-cases` | Opt-in / explicit invoke (`disable-model-invocation`). |
+| Generate Testiny QA CSV for a change | `generate-test-cases` | Opt-in / explicit invoke (`disable-model-invocation`). Writes `.testiny/testcases-<JIRA>.csv`. |
 | Sync OpenAPI YAML / API response examples with routers | `update-api-docs` | Prefer when `app/routers/` or `docs/api/openapi.yaml` changes; or when asked to refresh swagger/OpenAPI/examples. |
 | Simplify / dedupe / modularity refactor | `refactor-code` + `/ponytail` | **Required pairing:** when `/refactor-code` (or refactor-code) is invoked, **must** also enable `/ponytail` (default `full`). Applies to any programming language. Do not run refactor-code alone. Prefer `/ponytail-review` on the resulting diff. |
 

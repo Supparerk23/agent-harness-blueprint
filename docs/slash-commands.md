@@ -7,7 +7,7 @@ After install, the same playbooks appear under `.cursor/commands/` and/or `.clau
 | Command | Source | Purpose |
 |---|---|---|
 | `/start` | `harness/commands/start.md` | Branch + reset task memory skeletons (`PLANNING`, `RUN_LOG`, caches). |
-| `/commit` | `harness/commands/commit.md` | Inspect diffs/staging, craft conventional commits, push/upstream reminders. *(Template references JIRA + guarded branches—adapt on GitHub-only repos.)* |
+| `/commit` | `harness/commands/commit.md` | Inspect diffs/staging, craft conventional commits, push. Does **not** open a PR/MR — use `/pr`. *(Template references JIRA + guarded branches—adapt on GitHub-only repos.)* |
 | `/review` | `harness/commands/review.md` | Diff review checklist (security, correctness, performance). |
 | `/sync-dev` | `blueprints/engineering/gitlab/commands/` | Merge latest `develop` using `merge-tree` previews + conflict playbook. |
 | `/prerequisite` | GitLab overlay | GitLab **`glab`** bootstrap shared by MR-oriented commands. |

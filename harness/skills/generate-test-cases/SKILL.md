@@ -2,9 +2,10 @@
 name: generate-test-cases
 description: >-
   Generate a Testiny-importable CSV of QA test cases for a software change.
-  Use when the user explicitly asks to generate test cases, Testiny CSV,
-  QA test suite, or /generate-test-cases. Manual / opt-in only — do not
-  auto-invoke for ordinary coding, refactor, or unit-test work.
+  Writes only under .testiny/. Use when the user explicitly asks to generate
+  test cases, Testiny CSV, QA test suite, or /generate-test-cases. Manual /
+  opt-in only — do not auto-invoke for ordinary coding, refactor, or unit-test
+  work.
 disable-model-invocation: true
 ---
 
@@ -17,14 +18,14 @@ Do not merely mirror the implementation or dump trivial duplicates. Prefer quali
 ## Constraints
 
 - Never modify source code, project documentation, existing tests, or any user-supplied template file.
-- Only create the requested CSV output.
+- Only create the requested CSV under `.testiny/` at the repository root. Do not write Testiny output anywhere else.
 - Prefer read-only repository inspection; avoid unnecessary full-repo scans.
 - Do not fabricate requirements, acceptance criteria, business rules, or a JIRA identifier.
 - Never invent a different CSV schema than the one documented here (or a user-supplied template header).
 
 ## Manual workflow
 
-Execute only when the user explicitly requests this skill. Do not generate the CSV until the change, JIRA id, and output directory are resolved.
+Execute only when the user explicitly requests this skill. Do not generate the CSV until the change and JIRA id are resolved.
 
 ### 1. Resolve the change
 
@@ -38,18 +39,11 @@ Obtain a real ticket identifier (examples: `FIN-123`, `CORE-18`, `APP-901`). It 
 
 If it cannot be determined from context, ask. Never invent a JIRA id.
 
-### 3. Confirm output directory
+### 3. Output directory
 
-Always ask where to save the CSV. Suggest `~/Downloads/` as the default.
+Always write under `.testiny/` at the repository root. Create the directory if it is missing.
 
-Do **not** expand `~` into an absolute path (username varies by machine). Accept paths such as:
-
-- `~/Downloads/`
-- `~/Desktop/`
-- `./tests/testcases/`
-- `./docs/testcases/`
-
-Do not generate until the user confirms the location.
+Do not ask for a different save location. If the user names another path, still write only to `.testiny/` and say so.
 
 ### 4. Resolve CSV schema
 
@@ -69,9 +63,11 @@ Design a comprehensive suite, then perform a mandatory coverage self-review. Fil
 
 Write UTF-8 CSV to:
 
-`<output-directory>/testcases-<JIRA>.csv`
+`.testiny/testcases-<JIRA>.csv`
 
-Example: `~/Downloads/testcases-FIN-123.csv`
+Example: `.testiny/testcases-FIN-123.csv`
+
+Overwrite that path if a file for the same JIRA id already exists.
 
 ## Repository knowledge sources
 
@@ -207,4 +203,4 @@ After a successful write, report only:
 
 Do **not** print all generated test cases in chat. The CSV is the primary deliverable.
 
-If the output directory cannot be written, report the failure and do not claim success.
+If `.testiny/` cannot be created or written, report the failure and do not claim success.

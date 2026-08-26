@@ -14,11 +14,9 @@ Create a commit for the current changes.
    `git commit -m "jira number | 🤖 [message]"`
    `git push origin HEAD --set-upstream`
 
-5. Return message `✅ Committed : [commit hash]`
+4. Return message `✅ Committed : [commit hash]`
 
 Rules:
 - [jira number] find from branch name `feature/[jira number]` or `hotfix/[jira number]`
 - NEVER push to main or master directly
-- Always Open PR to `develop` when if on `feature/[jira number]` or `hotfix/[jira number]`
-- PR title = title message
-- Add label "ai-generated" to all AI-created PRs
+- Do **not** create a pull request or merge request. Stop after the commit hash. Use `/pr` to open a PR/MR.

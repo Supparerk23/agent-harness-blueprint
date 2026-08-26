@@ -28,6 +28,5 @@ This playbook is for package contributors only. Do not use consumer harness comm
 Rules:
 - **No JIRA number** in the commit message or title
 - NEVER push to main or master directly
-- Prefer opening a PR to the default branch (see `contributor/commands/pr.md`)
+- Do **not** open a pull request. Stop after the commit hash. Use `contributor/commands/pr.md` (or `/pr`) separately.
 - Do not commit consumer artifacts (`.cursor/`, `.claude/`, `PLANNING.md`, etc.)
-- Add label "ai-generated" to all AI-created PRs when opening one
