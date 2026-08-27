@@ -539,7 +539,7 @@ print_update_harness_summary() {
   printf 'Updated:\n'
   printf '  HARNESS.md\n'
   if [[ "$updated_runtimes" -eq 1 ]]; then
-    printf '  managed runtime projections (.cursor / .claude)\n'
+    printf '  managed runtime projections (.cursor / .claude / .agents)\n'
     printf '  rename cleanup + full skill/rule refresh (harness/migrations/renames.log)\n'
     printf '  managed .gitignore section\n'
     printf '  .agent-blueprint.yaml version\n'

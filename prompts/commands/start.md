@@ -9,7 +9,7 @@ Start a new task: create a branch and reset task-scoped memory files.
    `git checkout -b feature/ABC-1234`
 
 3. Reset task memory files using skill reset templates (read both files; copy templates exactly).
-   Resolve skill paths under the active runtime (`.cursor/skills/` or `.claude/skills/`):
+   Resolve skill paths under the active runtime (`.cursor/skills/`, `.claude/skills/`, or `.agents/skills/`):
    - `…/task-execution/templates.md` → `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md`
    - `…/context-recall/templates.md` → `HOTCACHE.md`, `ANTI-PATTERNS.md`, `LEARNING.md`
 

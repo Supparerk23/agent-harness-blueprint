@@ -76,7 +76,7 @@ To enable local `/commit`, `/pr`, and `skill-creator` in Cursor/Claude while wor
 ./blueprint install-contributor --runtime all
 ```
 
-This writes gitignored `.cursor/` / `.claude/` plus `.agent-blueprint.local.yaml` (`profile: package-contributor`). Do not commit those artifacts. `./blueprint doctor` allows them when the local marker is present.
+This writes gitignored `.cursor/` / `.claude/` / `.agents/` plus `.agent-blueprint.local.yaml` (`profile: package-contributor`). Do not commit those artifacts. `./blueprint doctor` allows them when the local marker is present.
 
 Before adding or substantially rewriting a skill under `harness/skills/`, follow [harness/skills/skill-creator/SKILL.md](harness/skills/skill-creator/SKILL.md) and the [Skill naming standard](docs/standards/skill-naming.md) (`<action>-<object>[-<context>]`).
 
@@ -86,7 +86,7 @@ Before adding or substantially rewriting a skill under `harness/skills/`, follow
 - **Harness content:** Prefer composition and blueprint overlays over forking entire profiles.
 - **Docs:** Keep root docs concise; put deep detail under `docs/`. Update docs when user-facing CLI behavior changes.
 - **Consumer contract:** Entrypoints live in `templates/entrypoints/`. Do not treat package-root `AGENTS.md` as a product-app contract.
-- **Do not** commit live `.cursor/` / `.claude/` trees or task-memory files into this package.
+- **Do not** commit live `.cursor/` / `.claude/` / `.agents/` trees or task-memory files into this package.
 
 ## Testing requirements
 

@@ -2,7 +2,7 @@
 
 Inventory of playbooks under `harness/commands/` (projected into the consumer runtime `commands/` directory).
 
-After install, the same playbooks appear under `.cursor/commands/` and/or `.claude/commands/`.
+After install, the same playbooks appear under `.cursor/commands/`, `.claude/commands/`, and/or `.agents/commands/`.
 
 | Command | Source | Purpose |
 |---|---|---|

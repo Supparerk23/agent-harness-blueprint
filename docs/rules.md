@@ -11,6 +11,7 @@ Shared defaults live under `harness/rules/`. After install:
 
 - Cursor: `.cursor/rules/*.mdc`
 - Claude Code: `.claude/rules/*.md` (same content; Cursor-only frontmatter keys are ignored)
+- Codex: `.agents/rules/*.md` (same markdown projection as Claude; Codex itself loads skills from `.agents/skills/`)
 
 ## `task-execution`
 

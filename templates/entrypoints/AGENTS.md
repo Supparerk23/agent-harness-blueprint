@@ -18,7 +18,7 @@ Before starting product work, install the harness:
 # /path/to/agent-harness-blueprint/blueprint install engineering --overlay gitlab --runtime all --target .
 ```
 
-`--runtime` may be `cursor`, `claude`, or `all`. Omit it to pick interactively. Refresh shared harness later with `./blueprint update --target .`. Re-sync runtimes with `./blueprint sync --target .`.
+`--runtime` may be `cursor`, `claude`, `codex`, or `all`. Omit it to pick interactively. Refresh shared harness later with `./blueprint update --target .`. Re-sync runtimes with `./blueprint sync --target .`.
 
 ## Project topics
 

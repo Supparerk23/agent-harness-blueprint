@@ -44,7 +44,7 @@ flowchart LR
 | **Skills** | Curated multi-step procedures | `<runtime>/skills/*/SKILL.md` |
 | **Memory** | Planning, decisions, telemetry, scratch | Repo root `*.md` |
 
-`<runtime>` is `.cursor` or `.claude`.
+`<runtime>` is `.cursor`, `.claude`, or `.agents`.
 
 ## Install / sync conflict policy
 

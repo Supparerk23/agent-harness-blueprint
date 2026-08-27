@@ -216,6 +216,21 @@ path_count="$(grep -c '"path"' "$BLUEPRINT_TARGETS_FILE" || true)"
 assert_eq "targets upsert no duplicate" "$path_count" "2"
 rm -rf "$other"
 
+echo "== install codex =="
+codex_t="${TMP}-codex"
+rm -rf "$codex_t"
+mkdir -p "$codex_t"
+CI=1 NO_COLOR=1 "$BP" init --target "$codex_t" >/dev/null 2>&1
+out="$(CI=1 NO_COLOR=1 "$BP" install default --runtime codex --target "$codex_t" 2>&1)"
+assert_contains "codex install completed" "$out" "Blueprint synchronization completed"
+assert_dir "codex skills" "$codex_t/.agents/skills"
+assert_file "codex context-recall" "$codex_t/.agents/skills/context-recall/SKILL.md"
+assert_file "codex start command" "$codex_t/.agents/commands/start.md"
+assert_file "codex rule md" "$codex_t/.agents/rules/safety-rules.md"
+assert_eq "codex no mdc rules" "$([[ -f "$codex_t/.agents/rules/safety-rules.mdc" ]] && echo yes || echo no)" "no"
+assert_contains "state lists codex" "$(cat "$codex_t/.agent-blueprint.yaml")" "codex"
+rm -rf "$codex_t"
+
 echo "== remote fetchable detection (unit via bash) =="
 # shellcheck source=lib/blueprint/repo.sh
 source "${ROOT}/lib/blueprint/term.sh"
@@ -290,6 +305,8 @@ CI=1 NO_COLOR=1 "$BP" init --target "$del_t" >/dev/null 2>&1
 assert_contains "agents has ref before del" "$(cat "$del_t/AGENTS.md")" "<!-- BLUEPRINT:HARNESS:START -->"
 assert_file "harness before del" "$del_t/HARNESS.md"
 assert_dir "cursor before del" "$del_t/.cursor"
+assert_dir "claude before del" "$del_t/.claude"
+assert_dir "agents before del" "$del_t/.agents"
 assert_file "planning before del" "$del_t/PLANNING.md"
 
 set +e
@@ -305,6 +322,7 @@ assert_eq "HARNESS.md removed" "$([[ -f "$del_t/HARNESS.md" ]] && echo yes || ec
 assert_eq "state removed" "$([[ -f "$del_t/.agent-blueprint.yaml" ]] && echo yes || echo no)" "no"
 assert_eq "cursor removed" "$([[ -d "$del_t/.cursor" ]] && echo yes || echo no)" "no"
 assert_eq "claude removed" "$([[ -d "$del_t/.claude" ]] && echo yes || echo no)" "no"
+assert_eq "agents removed" "$([[ -d "$del_t/.agents" ]] && echo yes || echo no)" "no"
 assert_eq "PLANNING removed" "$([[ -f "$del_t/PLANNING.md" ]] && echo yes || echo no)" "no"
 assert_eq "DECISIONS removed" "$([[ -f "$del_t/DECISIONS.md" ]] && echo yes || echo no)" "no"
 assert_eq "RUN_LOG removed" "$([[ -f "$del_t/RUN_LOG.md" ]] && echo yes || echo no)" "no"
@@ -317,6 +335,7 @@ assert_not_contains "managed gitignore gone" "$(cat "$del_t/.gitignore" 2>/dev/n
 # Help documents keyword-only del
 help_out="$(CI=1 NO_COLOR=1 "$BP" help 2>&1)"
 assert_contains "help lists del" "$help_out" "del"
+assert_contains "help lists codex runtime" "$help_out" "codex"
 assert_contains "help keyword note" "$help_out" "keyword only"
 assert_contains "help lists install-contributor" "$help_out" "install-contributor"
 assert_contains "help force example" "$help_out" "update --force --target"
@@ -361,7 +380,7 @@ assert_eq "consumer has no contributor-standards" \
   "$([[ -f "$TMP/.cursor/rules/contributor-standards.mdc" ]] && echo yes || echo no)" "no"
 
 # Project into package root (gitignored), verify doctor, then clean up.
-rm -rf "${ROOT}/.cursor" "${ROOT}/.claude"
+rm -rf "${ROOT}/.cursor" "${ROOT}/.claude" "${ROOT}/.agents"
 rm -f "${ROOT}/.agent-blueprint.local.yaml"
 out="$(CI=1 NO_COLOR=1 "$BP" install-contributor --runtime cursor --target "$ROOT" 2>&1)"
 assert_contains "install-contributor completed" "$out" "Blueprint synchronization completed"
@@ -375,7 +394,7 @@ assert_contains "contributor commit no jira" "$(cat "$ROOT/.cursor/commands/comm
 out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$ROOT" 2>&1)"
 assert_contains "doctor healthy with contributor runtime" "$out" "Healthy"
 assert_contains "doctor allows local cursor" "$out" "package-contributor local runtime"
-rm -rf "${ROOT}/.cursor" "${ROOT}/.claude"
+rm -rf "${ROOT}/.cursor" "${ROOT}/.claude" "${ROOT}/.agents"
 rm -f "${ROOT}/.agent-blueprint.local.yaml"
 out="$(CI=1 NO_COLOR=1 "$BP" doctor --target "$ROOT" 2>&1)"
 assert_contains "doctor healthy after contributor cleanup" "$out" "Healthy"

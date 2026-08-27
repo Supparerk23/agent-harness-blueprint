@@ -6,7 +6,7 @@ alwaysApply: true
 # Task Execution
 
 This rule intentionally stays thin to avoid overlap with the project skill:
-`<runtime>/skills/task-execution/SKILL.md` (`.cursor` or `.claude`).
+`<runtime>/skills/task-execution/SKILL.md` (`.cursor`, `.claude`, or `.agents`).
 
 When a user asks to execute work from `PLANNING.md` (or update planning progress),
 always apply that skill and follow its workflow.

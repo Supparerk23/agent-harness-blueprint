@@ -99,10 +99,15 @@ compatibility:
     - .claude/skills
     - .claude/rules
     - .claude/templates
+    - .agents/commands
+    - .agents/skills
+    - .agents/rules
+    - .agents/templates
   docs_root: docs/
   runtime_roots:
     - .cursor
     - .claude
+    - .agents
   source_root: harness
   entrypoints_root: templates/entrypoints
   managed_marker: "<!-- managed-by: shared-agent-blueprints -->"
@@ -112,6 +117,7 @@ compatibility:
   package_must_not_contain:
     - .cursor/
     - .claude/
+    - .agents/
     - PLANNING.md
     - DECISIONS.md
     - RUN_LOG.md

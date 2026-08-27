@@ -371,11 +371,24 @@ resolve_blueprint_dir() {
 }
 
 normalize_runtimes() {
-  case "$1" in
-    cursor) echo "cursor" ;;
-    claude) echo "claude" ;;
-    all) echo "cursor claude" ;;
-    *) die "unknown runtime: $1 (cursor|claude|all)" ;;
+  local raw="${1:-}"
+  case "$raw" in
+    all) echo "cursor claude codex" ;;
+    "") die "--runtime requires a value (cursor|claude|codex|all)" ;;
+    *)
+      local tok out="" seen=" "
+      for tok in $raw; do
+        case "$tok" in
+          cursor|claude|codex) ;;
+          *) die "unknown runtime: $tok (cursor|claude|codex|all)" ;;
+        esac
+        if [[ "$seen" != *" $tok "* ]]; then
+          out+="$tok "
+          seen+="$tok "
+        fi
+      done
+      echo "${out%% }"
+      ;;
   esac
 }
 
@@ -387,6 +400,17 @@ runtime_available() {
     claude)
       command -v claude >/dev/null 2>&1
       ;;
+    codex)
+      command -v codex >/dev/null 2>&1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# Claude and Codex consume markdown rules; Cursor uses .mdc.
+runtime_projects_md_rules() {
+  case "$1" in
+    claude|codex) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -403,23 +427,25 @@ runtime_hint() {
 # Interactive / auto selector when --runtime was not passed.
 select_runtime() {
   if [[ "$RUNTIME_SET" -eq 1 ]]; then
-    [[ -n "$RUNTIME" ]] || die "--runtime requires a value (cursor|claude|all)"
+    [[ -n "$RUNTIME" ]] || die "--runtime requires a value (cursor|claude|codex|all)"
     return 0
   fi
 
-  local cursor_hint claude_hint
+  local cursor_hint claude_hint codex_hint
   cursor_hint="$(runtime_hint cursor)"
   claude_hint="$(runtime_hint claude)"
+  codex_hint="$(runtime_hint codex)"
 
   if [[ ! -t 0 || ! -t 1 ]]; then
-    if runtime_available cursor && runtime_available claude; then
-      RUNTIME="all"
-    elif runtime_available claude; then
-      RUNTIME="claude"
-    elif runtime_available cursor; then
-      RUNTIME="cursor"
+    local detected=""
+    runtime_available cursor && detected+="cursor "
+    runtime_available claude && detected+="claude "
+    runtime_available codex && detected+="codex "
+    detected="${detected%% }"
+    if [[ -n "$detected" ]]; then
+      RUNTIME="$detected"
     else
-      die "no --runtime and no TTY; pass --runtime cursor|claude|all"
+      die "no --runtime and no TTY; pass --runtime cursor|claude|codex|all"
     fi
     emit_info "auto runtime (non-interactive): $RUNTIME"
     return 0
@@ -428,26 +454,28 @@ select_runtime() {
   cat <<EOF
 
 Select AI runtime to install into the target project.
-(Neither tool is required on PATH — this only chooses which files to write.)
+(Tools are not required on PATH — this only chooses which files to write.)
 
   1) cursor   Cursor IDE        (.cursor/)  — ${cursor_hint}
   2) claude   Claude Code       (.claude/)  — ${claude_hint}
-  3) all      Cursor + Claude   (both)
+  3) codex    OpenAI Codex      (.agents/)  — ${codex_hint}
+  4) all      Cursor + Claude + Codex
 
   Esc) back
 
 EOF
   local choice=""
   while true; do
-    if ! term_prompt_read 'Runtime [1-3] (Esc back): '; then
+    if ! term_prompt_read 'Runtime [1-4] (Esc back): '; then
       return 1
     fi
     choice="${BP_READ_RESULT:-}"
     case "$choice" in
       1|cursor|c) RUNTIME="cursor"; break ;;
       2|claude) RUNTIME="claude"; break ;;
-      3|all|a) RUNTIME="all"; break ;;
-      *) warn "invalid choice: $choice (use 1-3, or Esc)" ;;
+      3|codex|x) RUNTIME="codex"; break ;;
+      4|all|a) RUNTIME="all"; break ;;
+      *) warn "invalid choice: $choice (use 1-4, or Esc)" ;;
     esac
   done
   emit_info "selected runtime: $RUNTIME"
@@ -458,6 +486,7 @@ runtime_root_name() {
   case "$1" in
     cursor) echo ".cursor" ;;
     claude) echo ".claude" ;;
+    codex) echo ".agents" ;;
     *) die "unknown runtime: $1" ;;
   esac
 }
@@ -643,7 +672,7 @@ install_rules_into() {
   local src_rule dest_name
   while IFS= read -r src_rule; do
     [[ -z "$src_rule" ]] && continue
-    if [[ "$runtime" == "claude" ]]; then
+    if runtime_projects_md_rules "$runtime"; then
       dest_name="${src_rule%.mdc}.md"
     else
       dest_name="$src_rule"
@@ -892,7 +921,7 @@ install_contributor_runtime() {
   copy_file "${PACKAGE_ROOT}/contributor/commands/commit.md" "${base}/commands/commit.md"
   copy_file "${PACKAGE_ROOT}/contributor/commands/pr.md" "${base}/commands/pr.md"
 
-  if [[ "$runtime" == "claude" ]]; then
+  if runtime_projects_md_rules "$runtime"; then
     dest_name="contributor-standards.md"
   else
     dest_name="contributor-standards.mdc"
@@ -1049,6 +1078,7 @@ read_state_runtimes() {
   case "$legacy" in
     .cursor) echo "cursor" ;;
     .claude) echo "claude" ;;
+    .agents) echo "codex" ;;
     *) echo "" ;;
   esac
 }
@@ -1370,7 +1400,7 @@ cmd_update() {
     updated_runtimes=1
     emit_phase_complete "Updating managed runtime context"
   else
-    emit_info "no runtimes in state — skipped .cursor/.claude refresh (run install first)"
+    emit_info "no runtimes in state — skipped .cursor/.claude/.agents refresh (run install first)"
   fi
 
   # Stamp package version into state + targets registry.
@@ -1425,11 +1455,7 @@ cmd_sync() {
       local state_rts
       state_rts="$(read_state_runtimes "$state")"
       if [[ -n "$state_rts" ]]; then
-        if [[ "$state_rts" == *"cursor"* && "$state_rts" == *"claude"* ]]; then
-          RUNTIME="all"
-        else
-          RUNTIME="$(echo "$state_rts" | awk '{print $1}')"
-        fi
+        RUNTIME="$state_rts"
         RUNTIME_SET=1
       else
         emit_error "no runtimes in ${STATE_FILE}; run: ./blueprint install <blueprint>"
@@ -1568,7 +1594,7 @@ cmd_del() {
     ANTI-PATTERNS.md
   )
   local has_anything=0
-  if [[ -f "$state" || -f "${dest_root}/HARNESS.md" || -d "${dest_root}/.cursor" || -d "${dest_root}/.claude" || -d "${dest_root}/.agent-blueprint" ]]; then
+  if [[ -f "$state" || -f "${dest_root}/HARNESS.md" || -d "${dest_root}/.cursor" || -d "${dest_root}/.claude" || -d "${dest_root}/.agents" || -d "${dest_root}/.agent-blueprint" ]]; then
     has_anything=1
   fi
   local mf
@@ -1601,7 +1627,7 @@ cmd_del() {
 
   emit_phase_start "Confirm removal"
   emit_info "target: $dest_root"
-  emit_info "will remove: HARNESS.md (if managed), memory files (PLANNING/DECISIONS/RUN_LOG/HOTCACHE/LEARNING/ANTI-PATTERNS), .cursor/, .claude/, .agent-blueprint.yaml, .agent-blueprint/, managed .gitignore section, harness reference block"
+  emit_info "will remove: HARNESS.md (if managed), memory files (PLANNING/DECISIONS/RUN_LOG/HOTCACHE/LEARNING/ANTI-PATTERNS), .cursor/, .claude/, .agents/, .agent-blueprint.yaml, .agent-blueprint/, managed .gitignore section, harness reference block"
   emit_info "will preserve: AGENTS.md / agents.md / CLAUDE.md body, local overrides"
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -1675,6 +1701,7 @@ cmd_del() {
   # Runtime projections (fully managed / typically gitignored).
   del_remove_path "${dest_root}/.cursor"
   del_remove_path "${dest_root}/.claude"
+  del_remove_path "${dest_root}/.agents"
 
   # Install state + session resume dir.
   del_remove_path "${dest_root}/${STATE_FILE}"
@@ -1772,7 +1799,7 @@ cmd_doctor() {
       contributor_local=1
       ui_ok "contributor local marker (${LOCAL_OVERRIDE})"
     fi
-    for bad in .cursor .claude; do
+    for bad in .cursor .claude .agents; do
       if [[ -e "${dest_root}/${bad}" ]]; then
         if [[ "$contributor_local" -eq 1 ]]; then
           ui_ok "$bad (package-contributor local runtime)"
@@ -1864,7 +1891,7 @@ cmd_doctor() {
       else
         local found_runtime=0
         local rt rt_root
-        for rt in cursor claude; do
+        for rt in cursor claude codex; do
           rt_root="$(runtime_root_name "$rt")"
           if [[ -d "${dest_root}/${rt_root}" ]]; then
             if echo " $declared " | grep -q " $rt "; then
@@ -1969,8 +1996,8 @@ Blueprints:
 
 Flags:
   --overlay gitlab     Install GitLab/glab command overlay
-  --runtime NAME       cursor | claude | all
-                       (omit to get an interactive selector; both tools optional)
+  --runtime NAME       cursor | claude | codex | all
+                       (omit to get an interactive selector; tools optional)
   --target PATH        Consumer project root (any local path; not this package)
                        (install-contributor: must be this package root)
   --dry-run            Print actions without writing
@@ -1998,7 +2025,7 @@ Remote source:
 
 Package contributors:
   ./blueprint install-contributor --runtime all
-  Projects contributor/ + skill-creator into gitignored .cursor/.claude
+  Projects contributor/ + skill-creator into gitignored .cursor/.claude/.agents
   (writes .agent-blueprint.local.yaml; not for consumer targets).
 EOF
 }

@@ -45,19 +45,25 @@ targets_count() {
   printf '%s' "$n"
 }
 
+# Consumer runtime directory names (projections).
+consumer_runtime_roots() {
+  printf '%s\n' .cursor .claude .agents
+}
+
 # Count unresolved *.blueprint-conflict siblings under consumer runtimes.
 target_conflict_count() {
   local root="$1"
   local n=0
   local rt c
-  for rt in .cursor .claude; do
+  while IFS= read -r rt; do
+    [[ -n "$rt" ]] || continue
     if [[ -d "${root}/${rt}" ]]; then
       c="$(find "${root}/${rt}" -name '*.blueprint-conflict' -type f 2>/dev/null | wc -l | tr -d ' ')"
       if [[ "$c" =~ ^[0-9]+$ ]]; then
         n=$((n + c))
       fi
     fi
-  done
+  done < <(consumer_runtime_roots)
   printf '%s' "$n"
 }
 
@@ -65,11 +71,12 @@ target_conflict_count() {
 target_conflict_list() {
   local root="$1"
   local rt
-  for rt in .cursor .claude; do
+  while IFS= read -r rt; do
+    [[ -n "$rt" ]] || continue
     if [[ -d "${root}/${rt}" ]]; then
       find "${root}/${rt}" -name '*.blueprint-conflict' -type f 2>/dev/null | sort
     fi
-  done
+  done < <(consumer_runtime_roots)
 }
 
 # Count overwrite backups (*.blueprint-backup.*) under runtimes + project root.
@@ -77,14 +84,15 @@ target_backup_count() {
   local root="$1"
   local n=0
   local rt c
-  for rt in .cursor .claude; do
+  while IFS= read -r rt; do
+    [[ -n "$rt" ]] || continue
     if [[ -d "${root}/${rt}" ]]; then
       c="$(find "${root}/${rt}" -name '*.blueprint-backup.*' -type f 2>/dev/null | wc -l | tr -d ' ')"
       if [[ "$c" =~ ^[0-9]+$ ]]; then
         n=$((n + c))
       fi
     fi
-  done
+  done < <(consumer_runtime_roots)
   if [[ -d "$root" ]]; then
     c="$(find "$root" -maxdepth 1 -name '*.blueprint-backup.*' -type f 2>/dev/null | wc -l | tr -d ' ')"
     if [[ "$c" =~ ^[0-9]+$ ]]; then
@@ -99,11 +107,12 @@ target_backup_list() {
   local root="$1"
   local rt
   {
-    for rt in .cursor .claude; do
+    while IFS= read -r rt; do
+      [[ -n "$rt" ]] || continue
       if [[ -d "${root}/${rt}" ]]; then
         find "${root}/${rt}" -name '*.blueprint-backup.*' -type f 2>/dev/null
       fi
-    done
+    done < <(consumer_runtime_roots)
     if [[ -d "$root" ]]; then
       find "$root" -maxdepth 1 -name '*.blueprint-backup.*' -type f 2>/dev/null
     fi

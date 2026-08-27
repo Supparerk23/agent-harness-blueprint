@@ -29,4 +29,4 @@ Rules:
 - **No JIRA number** in the commit message or title
 - NEVER push to main or master directly
 - Do **not** open a pull request. Stop after the commit hash. Use `contributor/commands/pr.md` (or `/pr`) separately.
-- Do not commit consumer artifacts (`.cursor/`, `.claude/`, `PLANNING.md`, etc.)
+- Do not commit consumer artifacts (`.cursor/`, `.claude/`, `.agents/`, `PLANNING.md`, etc.)

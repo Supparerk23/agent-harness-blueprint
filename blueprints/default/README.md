@@ -15,4 +15,4 @@ Core shared agent harness for any repository.
 - GitLab `glab` MR automation
 - Project-specific engineering etiquette
 
-Use `engineering` plus forge overlays (`--overlay gitlab`) when those are needed. Choose `--runtime cursor|claude|all` for the tool projection.
+Use `engineering` plus forge overlays (`--overlay gitlab`) when those are needed. Choose `--runtime cursor|claude|codex|all` for the tool projection.

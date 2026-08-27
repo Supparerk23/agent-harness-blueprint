@@ -12,7 +12,7 @@ This file is managed by **shared-agent-blueprints**. Project-specific agent role
 2. Local overrides (`AGENTS.local.md`, `CLAUDE.local.md`, `.agent-blueprint.local.yaml`, `*.local.mdc`)
 3. This `HARNESS.md` (lifecycle, safety, quality gates, completion)
 4. Project agent contract (`AGENTS.md` or `agents.md`) outside the managed harness reference
-5. Runtime rules / skills under `.cursor/` or `.claude/`
+5. Runtime rules / skills under `.cursor/`, `.claude/`, or `.agents/`
 
 ## Harness overview
 
@@ -33,6 +33,7 @@ After `install --runtime …`:
 |---|---|---|---|---|---|
 | Cursor | `.cursor/` | `.cursor/commands/` | `.cursor/rules/` | `.cursor/skills/` | `.cursor/templates/` |
 | Claude Code | `.claude/` | `.claude/commands/` | `.claude/rules/` | `.claude/skills/` | `.claude/templates/` |
+| Codex | `.agents/` | `.agents/commands/` | `.agents/rules/` | `.agents/skills/` | `.agents/templates/` |
 
 Workflow templates (`adr`, `prd`, `review-checklist`) stay under the runtime — they are not copied to a project-root `templates/` folder.
 

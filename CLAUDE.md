@@ -27,7 +27,7 @@ Package-source only — does not install into target projects:
 
 ## Don't
 
-- Commit consumer memory files or `.cursor/` / `.claude/` into this package
+- Commit consumer memory files or `.cursor/` / `.claude/` / `.agents/` into this package
 - Assume GitLab or stack-specific overlays apply to every install
 - Promote every learning note into a shared rule without human review
 - Treat `contributor/` as content for consumer blueprint installs

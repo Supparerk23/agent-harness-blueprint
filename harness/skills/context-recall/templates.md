@@ -67,4 +67,4 @@ Candidate insights for human review. Not authoritative — promote to skills or 
 ## Do not reset on task start
 
 - `ARCHITECTURE.md` — system design
-- Installed skill trees under the active runtime (`.cursor/skills/`, `.claude/skills/`) — curated procedural knowledge
+- Installed skill trees under the active runtime (`.cursor/skills/`, `.claude/skills/`, `.agents/skills/`) — curated procedural knowledge

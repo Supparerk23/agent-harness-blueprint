@@ -122,14 +122,14 @@ refresh_package_skills_into() {
 }
 
 # refresh_package_rules_into <destRulesDir> <runtime>
-# Full refresh of package-managed rules (handles Cursor .mdc / Claude .md).
+# Full refresh of package-managed rules (Cursor .mdc / Claude+Codex .md).
 refresh_package_rules_into() {
   local dest_rules="$1"
   local runtime="$2"
   local src_rule dest_name base
   while IFS= read -r src_rule; do
     [[ -z "$src_rule" ]] && continue
-    if [[ "$runtime" == "claude" ]]; then
+    if [[ "$runtime" == "claude" || "$runtime" == "codex" ]]; then
       dest_name="${src_rule%.mdc}.md"
     else
       dest_name="$src_rule"
