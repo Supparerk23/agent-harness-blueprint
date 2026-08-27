@@ -78,7 +78,16 @@ To enable local `/commit`, `/pr`, and `skill-creator` in Cursor/Claude while wor
 
 This writes gitignored `.cursor/` / `.claude/` / `.agents/` plus `.agent-blueprint.local.yaml` (`profile: package-contributor`). Do not commit those artifacts. `./blueprint doctor` allows them when the local marker is present.
 
-Before adding or substantially rewriting a skill under `harness/skills/`, follow [harness/skills/skill-creator/SKILL.md](harness/skills/skill-creator/SKILL.md) and the [Skill naming standard](docs/standards/skill-naming.md) (`<action>-<object>[-<context>]`).
+`install-contributor` projects **only** this set (not the consumer skill pack):
+
+| Kind | Name | Source |
+|---|---|---|
+| Command | `/commit` | [`contributor/commands/commit.md`](contributor/commands/commit.md) |
+| Command | `/pr` | [`contributor/commands/pr.md`](contributor/commands/pr.md) |
+| Rule | contributor-standards | [`contributor/rules/contributor-standards.mdc`](contributor/rules/contributor-standards.mdc) |
+| Skill | `skill-creator` | [`harness/skills/skill-creator/SKILL.md`](harness/skills/skill-creator/SKILL.md) |
+
+Before adding or substantially rewriting a consumer skill under `harness/skills/`, use `/skill-creator` and follow the [Skill naming standard](docs/standards/skill-naming.md). The consumer inventory lives in [docs/skills.md](docs/skills.md).
 
 ## Coding style
 

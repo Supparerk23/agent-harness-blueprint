@@ -26,12 +26,14 @@ Standards for contributors and agents working **on this package**. Unrelated to 
 
 | Playbook | Path |
 |---|---|
-| Commits (no JIRA) | [contributor/commands/commit.md](contributor/commands/commit.md) |
-| PRs + release notes | [contributor/commands/pr.md](contributor/commands/pr.md) |
+| `/commit` (no JIRA) | [contributor/commands/commit.md](contributor/commands/commit.md) |
+| `/pr` + release notes | [contributor/commands/pr.md](contributor/commands/pr.md) |
 | Always-on standards | [contributor/rules/contributor-standards.mdc](contributor/rules/contributor-standards.mdc) |
+| `skill-creator` | [harness/skills/skill-creator/SKILL.md](harness/skills/skill-creator/SKILL.md) |
 
-- Before adding or substantially rewriting a skill under `harness/skills/`, read and follow [harness/skills/skill-creator/SKILL.md](harness/skills/skill-creator/SKILL.md) and [docs/standards/skill-naming.md](docs/standards/skill-naming.md).
-- Optional local slash commands: `./blueprint install-contributor --runtime all` (gitignored `.cursor` / `.claude` / `.agents`; see [CONTRIBUTING.md](CONTRIBUTING.md)).
+`./blueprint install-contributor --runtime all` projects **only** those four into gitignored `.cursor` / `.claude` / `.agents` (see [CONTRIBUTING.md](CONTRIBUTING.md)). It does not install consumer skills (`context-recall`, `ponytail`, `generate-test-cases`, …). Those stay under `harness/skills/` for target `install`; see [docs/skills.md](docs/skills.md).
+
+- Before adding or substantially rewriting a skill under `harness/skills/`, read and follow `skill-creator` and [docs/standards/skill-naming.md](docs/standards/skill-naming.md).
 
 ## Package edit order
 

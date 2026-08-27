@@ -16,8 +16,8 @@ Package-source only — does not install into target projects:
 
 - Commits: `contributor/commands/commit.md` (conventional commits, **no JIRA**)
 - PRs: `contributor/commands/pr.md` (GitHub `gh` + short **Release notes** for `CHANGELOG.md`)
-- New/edited skills under `harness/skills/`: follow `harness/skills/skill-creator/SKILL.md` first and `docs/standards/skill-naming.md`
-- Optional local IDE projection: `./blueprint install-contributor --runtime all`
+- Skill: `skill-creator` only (`harness/skills/skill-creator/SKILL.md` + [docs/standards/skill-naming.md](docs/standards/skill-naming.md)). Consumer skills are not part of this harness — see [docs/skills.md](docs/skills.md).
+- Optional local IDE projection: `./blueprint install-contributor --runtime all` (`/commit`, `/pr`, `skill-creator`)
 
 ## Do
 
