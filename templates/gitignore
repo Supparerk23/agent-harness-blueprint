@@ -2,6 +2,8 @@
 # Local overrides and install conflict siblings — keep out of git.
 .cursor/
 .claude/
+.agents/
+.testiny/
 PLANNING.md
 DECISIONS.md
 RUN_LOG.md
@@ -9,6 +11,7 @@ HOTCACHE.md
 LEARNING.md
 ANTI-PATTERNS.md
 *.blueprint-conflict
+*.blueprint-backup.*
 .agent-blueprint.local.yaml
 .agent-blueprint/
 AGENTS.local.md

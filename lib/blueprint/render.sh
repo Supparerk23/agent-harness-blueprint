@@ -132,7 +132,7 @@ render_menu() {
 
   render_panel_open "Commands" "$width"
   render_panel_cmd_row "1" "init" "HARNESS.md + agent reference + memory" "$width"
-  render_panel_cmd_row "2" "install" "Blueprint + runtime (cursor / claude / all)" "$width"
+  render_panel_cmd_row "2" "install" "Blueprint + runtime (cursor / claude / codex / all)" "$width"
   render_panel_cmd_row "3" "sync" "Re-apply installed blueprint" "$width"
   render_panel_cmd_row "4" "update" "Version check + refresh managed context" "$width"
   render_panel_cmd_row "5" "doctor" "Validate package / target health" "$width"
@@ -141,6 +141,7 @@ render_menu() {
   render_panel_cmd_row "h" "help" "Show CLI usage" "$width" "cyan" "left"
   render_panel_cmd_row "q" "quit" "Exit" "$width" "cyan" "left"
   render_panel_cmd_row "del" "" "Remove blueprint from this target" "$width" "yellow" "left"
+  render_panel_cmd_row "clean" "" "Delete *.blueprint-backup.* on this target" "$width" "yellow" "left"
   render_panel_cmd_row "Esc" "" "Back to previous screen" "$width" "dim" "left"
   render_panel_close "$width"
 
@@ -222,6 +223,12 @@ render_panel_cmd_row() {
 
   local inner=$((width - 2))
   local key_w=3
+  if [[ ${#key} -gt "$key_w" ]]; then
+    key_w=${#key}
+  fi
+  if [[ "$key_w" -gt 6 ]]; then
+    key_w=6
+  fi
   local label_w=8
   local key_s label_s desc_s
   key_s="$(term_pad "$key" "$key_w" "$key_align")"
@@ -321,6 +328,7 @@ render_divider() {
 # Render known consumer targets as a column table.
 # Args: package_version path1 ver1 [path2 ver2 ...]
 # Writes to stderr (picker UI).
+# Columns: # | Name (status icon prefixed, colored) | Path | Version
 render_targets_table() {
   local pkg_ver="${1:-}"
   shift || true
@@ -336,31 +344,34 @@ render_targets_table() {
 
   local n=${#paths[@]}
   local width="${BP_TERM_WIDTH:-80}"
-  if [[ "$width" -lt 60 ]]; then width=60; fi
+  if [[ "$width" -lt 64 ]]; then width=64; fi
   if [[ "$width" -gt 100 ]]; then width=100; fi
 
-  # Columns: # | Name | Path | Version | Status
-  # total ≈ indent(2) + borders(6) + pads(10) + cols
+  # Ratios of remaining width after # + Version: Name ~45%, Path ~55%
   local col_num=3
-  local col_name=18
   local col_ver=8
-  local col_status=8
-  local overhead=18
-  local col_path=$((width - overhead - col_num - col_name - col_ver - col_status))
-  if [[ "$col_path" -lt 12 ]]; then
-    col_name=14
-    col_path=$((width - overhead - col_num - col_name - col_ver - col_status))
+  local overhead=14
+  local rest=$((width - overhead - col_num - col_ver))
+  if [[ "$rest" -lt 28 ]]; then rest=28; fi
+  local col_name=$((rest * 45 / 100))
+  if [[ "$col_name" -lt 18 ]]; then col_name=18; fi
+  if [[ "$col_name" -gt 28 ]]; then col_name=28; fi
+  local col_path=$((rest - col_name))
+  if [[ "$col_path" -lt 16 ]]; then
+    col_path=16
+    col_name=$((rest - col_path))
+    if [[ "$col_name" -lt 14 ]]; then col_name=14; fi
   fi
-  if [[ "$col_path" -lt 10 ]]; then col_path=10; fi
 
   local fancy=0
   if [[ "${BP_IS_TTY:-0}" -eq 1 && "${BP_IS_CI:-0}" -eq 0 && "${BP_USE_COLOR:-0}" -eq 1 ]]; then
     fancy=1
   fi
 
+  # Match Actions panel: rounded outer corners.
   local tl tr bl br h v tj tj_l tj_r tj_t cross
   if [[ "$fancy" -eq 1 ]]; then
-    tl="┌"; tr="┐"; bl="└"; br="┘"
+    tl="╭"; tr="╮"; bl="╰"; br="╯"
     h="─"; v="│"
     tj="┬"; tj_l="├"; tj_r="┤"; tj_t="┴"; cross="┼"
   else
@@ -369,17 +380,16 @@ render_targets_table() {
     tj="+"; tj_l="+"; tj_r="+"; tj_t="+"; cross="+"
   fi
 
-  local seg_num seg_name seg_path seg_ver seg_status
+  local seg_num seg_name seg_path seg_ver
   seg_num="$(term_repeat "$h" $((col_num + 2)))"
   seg_name="$(term_repeat "$h" $((col_name + 2)))"
   seg_path="$(term_repeat "$h" $((col_path + 2)))"
   seg_ver="$(term_repeat "$h" $((col_ver + 2)))"
-  seg_status="$(term_repeat "$h" $((col_status + 2)))"
 
   local rule_top rule_mid rule_bot
-  rule_top="${tl}${seg_num}${tj}${seg_name}${tj}${seg_path}${tj}${seg_ver}${tj}${seg_status}${tr}"
-  rule_mid="${tj_l}${seg_num}${cross}${seg_name}${cross}${seg_path}${cross}${seg_ver}${cross}${seg_status}${tj_r}"
-  rule_bot="${bl}${seg_num}${tj_t}${seg_name}${tj_t}${seg_path}${tj_t}${seg_ver}${tj_t}${seg_status}${br}"
+  rule_top="${tl}${seg_num}${tj}${seg_name}${tj}${seg_path}${tj}${seg_ver}${tr}"
+  rule_mid="${tj_l}${seg_num}${cross}${seg_name}${cross}${seg_path}${cross}${seg_ver}${tj_r}"
+  rule_bot="${bl}${seg_num}${tj_t}${seg_name}${tj_t}${seg_path}${tj_t}${seg_ver}${br}"
 
   printf '  %sKnown projects%s' "$(term_color bold)" "$(term_color reset)" >&2
   if [[ -n "$pkg_n" ]]; then
@@ -389,75 +399,129 @@ render_targets_table() {
 
   printf '  %s%s%s\n' "$(term_color cyan)" "$rule_top" "$(term_color reset)" >&2
 
-  local c0 c1 c2 c3 c4
+  local c0 c1 c2 c3
   c0="$(term_pad "#" "$col_num" right)"
   c1="$(term_pad "Name" "$col_name")"
   c2="$(term_pad "Path" "$col_path")"
   c3="$(term_pad "Version" "$col_ver")"
-  c4="$(term_pad "Status" "$col_status")"
-  printf '  %s%s%s %s %s%s%s %s %s%s%s %s %s%s%s %s %s%s%s %s %s%s%s\n' \
+  printf '  %s%s%s %s %s%s%s %s %s%s%s %s %s%s%s %s %s%s%s\n' \
     "$(term_color cyan)" "$v" "$(term_color reset)" "$c0" \
     "$(term_color cyan)" "$v" "$(term_color reset)" "$c1" \
     "$(term_color cyan)" "$v" "$(term_color reset)" "$c2" \
     "$(term_color cyan)" "$v" "$(term_color reset)" "$c3" \
-    "$(term_color cyan)" "$v" "$(term_color reset)" "$c4" \
     "$(term_color cyan)" "$v" "$(term_color reset)" >&2
 
   printf '  %s%s%s\n' "$(term_color cyan)" "$rule_mid" "$(term_color reset)" >&2
 
-  local i path disp name tv tv_n status status_color
+  local i path disp name tv tv_n icon icon_slot icon_color conflict_n backup_n labeled outdated
   for ((i = 0; i < n; i++)); do
     path="${paths[$i]}"
     disp="$(term_home_path "$path")"
     name="$(basename "$path")"
     tv="${vers[$i]:-?}"
     tv_n="${tv#v}"
-    if [[ -z "$tv_n" || "$tv_n" == "?" || "$tv_n" == "null" ]]; then
+    conflict_n=0
+    backup_n=0
+    outdated=0
+    if command -v target_conflict_count >/dev/null 2>&1; then
+      conflict_n="$(target_conflict_count "$path" 2>/dev/null || echo 0)"
+    fi
+    if command -v target_backup_count >/dev/null 2>&1; then
+      backup_n="$(target_backup_count "$path" 2>/dev/null || echo 0)"
+    fi
+    if [[ ! "$conflict_n" =~ ^[0-9]+$ ]]; then
+      conflict_n=0
+    fi
+    if [[ ! "$backup_n" =~ ^[0-9]+$ ]]; then
+      backup_n=0
+    fi
+    if [[ "$conflict_n" -gt 0 ]]; then
+      if [[ "$backup_n" -gt 0 ]]; then
+        icon="!*"
+      else
+        icon="!"
+      fi
+      icon_color="yellow"
+      if [[ -z "$tv_n" || "$tv_n" == "?" || "$tv_n" == "null" ]]; then
+        tv_n="?"
+      fi
+    elif [[ -z "$tv_n" || "$tv_n" == "?" || "$tv_n" == "null" ]]; then
       tv_n="?"
-      status="unknown"
-      status_color="dim"
+      if [[ "$backup_n" -gt 0 ]]; then
+        icon="?*"
+        icon_color="yellow"
+      else
+        icon="?"
+        icon_color="dim"
+      fi
     elif [[ -n "$pkg_n" && "$tv_n" != "$pkg_n" ]]; then
-      status="outdated"
-      status_color="red"
+      outdated=1
+      if [[ "$backup_n" -gt 0 ]]; then
+        icon="↓*"
+        icon_color="yellow"
+      else
+        icon="↓"
+        icon_color="red"
+      fi
     else
-      status="current"
-      status_color="green"
+      if [[ "$backup_n" -gt 0 ]]; then
+        icon="✓*"
+        icon_color="yellow"
+      else
+        icon="✓"
+        icon_color="green"
+      fi
     fi
 
+    # Fixed 2-char icon slot keeps Name/Path/Version columns aligned.
+    if [[ ${#icon} -eq 1 ]]; then
+      icon_slot="${icon} "
+    else
+      icon_slot="$icon"
+    fi
+    labeled="${icon_slot}${name}"
     c0="$(term_pad "$((i + 1))" "$col_num" right)"
-    c1="$(term_pad "$name" "$col_name")"
+    c1="$(term_pad "$labeled" "$col_name")"
     c2="$(term_pad "$disp" "$col_path")"
     c3="$(term_pad "v${tv_n}" "$col_ver")"
-    c4="$(term_pad "$status" "$col_status")"
 
-    printf '  %s%s%s %s%s%s %s%s%s %s %s%s%s %s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s\n' \
+    printf '  %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s %s%s%s ' \
       "$(term_color cyan)" "$v" "$(term_color reset)" \
       "$(term_color cyan)" "$c0" "$(term_color reset)" \
       "$(term_color cyan)" "$v" "$(term_color reset)" \
-      "$c1" \
+      "$(term_color "$icon_color")" "$c1" "$(term_color reset)" \
       "$(term_color cyan)" "$v" "$(term_color reset)" \
       "$c2" \
-      "$(term_color cyan)" "$v" "$(term_color reset)" \
-      "$(term_color "$status_color")" "$c3" "$(term_color reset)" \
-      "$(term_color cyan)" "$v" "$(term_color reset)" \
-      "$(term_color "$status_color")" "$c4" "$(term_color reset)" \
       "$(term_color cyan)" "$v" "$(term_color reset)" >&2
+    if [[ "$outdated" -eq 1 ]]; then
+      printf '%s%s%s' "$(term_color red)" "$c3" "$(term_color reset)" >&2
+    else
+      printf '%s' "$c3" >&2
+    fi
+    printf ' %s%s%s\n' "$(term_color cyan)" "$v" "$(term_color reset)" >&2
   done
 
   printf '  %s%s%s\n' "$(term_color cyan)" "$rule_bot" "$(term_color reset)" >&2
+  printf '  %s%s✓%s current  %s↓%s outdated  %s!%s conflicts  %s*%s needs clean\n' \
+    "$(term_color dim)" \
+    "$(term_color green)" "$(term_color reset)" \
+    "$(term_color red)" "$(term_color reset)" \
+    "$(term_color yellow)" "$(term_color reset)" \
+    "$(term_color yellow)" "$(term_color reset)" >&2
   printf '\n' >&2
 }
 
-# Framed actions panel for target picker (add / rm / q).
+# Framed actions panel for target picker (add / rm / clean / q).
 # Writes to stderr.
 render_targets_actions() {
   local width="${1:-56}"
-  if [[ "$width" -gt 56 ]]; then width=56; fi
-  if [[ "$width" -lt 40 ]]; then width=40; fi
+  if [[ "$width" -gt 64 ]]; then width=64; fi
+  if [[ "$width" -lt 48 ]]; then width=48; fi
 
   render_panel_open "Actions" "$width" >&2
   render_panel_cmd_row "add" "" "Add new target project" "$width" "cyan" "left" >&2
   render_panel_cmd_row "rm" "" "Remove a target" "$width" "yellow" "left" >&2
+  render_panel_cmd_row "clean" "" "Delete *.blueprint-backup.* on a target" "$width" "yellow" "left" >&2
   render_panel_cmd_row "q" "" "Quit" "$width" "cyan" "left" >&2
   render_panel_close "$width" >&2
   printf '\n' >&2
@@ -493,6 +557,9 @@ render_summary_success() {
       printf '      %s−%s Removed   %s\n' "$(term_color yellow)" "$(term_color reset)" "${BP_COUNT_REMOVED:-0}"
     fi
     printf '      %s⊘%s Skipped   %s\n' "$(term_color dim)" "$(term_color reset)" "$BP_COUNT_SKIPPED"
+    if [[ "${BP_COUNT_CONFLICT:-0}" -gt 0 ]]; then
+      printf '      %s!%s Conflict  %s\n' "$(term_color yellow)" "$(term_color reset)" "$BP_COUNT_CONFLICT"
+    fi
     printf '      %s✗%s Failed    %s\n' "$(term_color red)" "$(term_color reset)" "$BP_COUNT_FAILED"
   fi
   printf '\n      %sRun%s  %s\n\n' "$(term_color dim)" "$(term_color reset)" "$BP_RUN_ID"

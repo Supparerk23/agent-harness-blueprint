@@ -9,7 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `generate-test-cases` skill — Senior QA playbook that writes Testiny-importable CSV test suites for a software change (manual / opt-in); renamed from `testcase-generator` for action-first naming
+- Skill naming standard (`docs/standards/skill-naming.md`) enforced via skill-creator + contributor gate; `doctor` validates package skill names
+- `update-api-docs` skill — sync FastAPI `docs/api/openapi.yaml` and response examples with `app/routers/`
+- Conflict overwrite UX: project-level conflict warnings, interactive TTY prompt to apply `*.blueprint-conflict` siblings, target-picker status, and `doctor` warnings for unresolved siblings
+- Successful package writes remove stale `*.blueprint-conflict` siblings for that path (so `--force` / managed refresh clears doctor conflict noise)
+- `blueprint clean` deletes reviewed `*.blueprint-backup.*` leftovers; Known projects prefixes Name with status icons (`✓` / `↓` / `!` / `*`)
+- Package-only contributor harness under `contributor/` (commit without JIRA, GitHub PR + release notes, skill-creator gate)
+- `blueprint install-contributor` for optional local IDE projection of contributor playbooks
 - Community health files for open-source adoption (license, contributing guide, code of conduct, security policy, GitHub templates)
+
+### Changed
+
+- `--runtime codex` projects into `.agents/` (Codex reads skills from `.agents/skills/`); `--runtime all` includes Cursor, Claude, and Codex
+- `generate-test-cases` always writes CSV under `.testiny/` (gitignored); no Downloads prompt
+- `generate-test-cases` canonical Testiny header now matches the live import (`Section` instead of `Component`; fill-rule examples for `Active?`, `Priority`, `Sprint`)
+- `--force` help text clarifies it overwrites unmanaged conflicting runtime files (not only `del`)
+- Success summary prints an explicit Conflict count when conflicts occurred
 
 ## [1.2.0] - 2026-08-03
 

@@ -68,13 +68,13 @@ File ownership for `HARNESS.md` vs agent instruction files: **[docs/harness-owne
 
 | Step | Writes | Does not write |
 |---|---|---|
-| `init` | `HARNESS.md`, compact harness reference in the selected root instruction file (`AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md`, or create `AGENTS.md`), memory skeletons, managed `.gitignore` section, `.agent-blueprint.yaml`, local override stub | `.cursor/`, `.claude/`; never auto-creates `CLAUDE.md` |
+| `init` | `HARNESS.md`, compact harness reference in the selected root instruction file (`AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md`, or create `AGENTS.md`), memory skeletons, managed `.gitignore` section, `.agent-blueprint.yaml`, local override stub | `.cursor/`, `.claude/`, `.agents/`; never auto-creates `CLAUDE.md` |
 | `install` | Selected blueprint into `--runtime` roots; preserves agent instruction files | Existing memory file **content**; root `AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md` |
 | `update` | Version check; refresh `HARNESS.md`; apply `harness/migrations/renames.log` (remove old skill/rule paths); full-refresh package skills/rules into declared runtimes; stamp state version | Agent instruction files (`AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md`) |
 | `sync` | Re-applies installed blueprint + runtimes (`preserve-local`); may fetch remote `source` into `$XDG_CACHE_HOME/blueprint/repos/` | Unmanaged / local overrides; agent instruction files |
 | `del` | Removes managed harness/runtimes/state/gitignore section, memory files, and harness reference block | `AGENTS.md` / `agents.md` / `CLAUDE.md` / `claude.md` bodies; local overrides |
 
-`--runtime`: `cursor` | `claude` | `all`. If omitted, `install` shows an interactive selector (Cursor and Claude are both optional). Non-interactive shells auto-pick from PATH or require `--runtime`.
+`--runtime`: `cursor` | `claude` | `codex` | `all`. If omitted, `install` shows an interactive selector (each tool is optional). Non-interactive shells auto-pick from PATH or require `--runtime`.
 
 ## Remote source
 

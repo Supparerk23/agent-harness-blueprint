@@ -24,6 +24,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 |---|---|
 | `.cursor/` | Cursor runtime projected from `harness/` |
 | `.claude/` | Claude Code runtime projected from `harness/` |
+| `.agents/` | Codex runtime projected from `harness/` (skills live in `.agents/skills/`) |
 | `PLANNING.md`, `DECISIONS.md`, `RUN_LOG.md` | Task planning / rationale / telemetry state |
 | `HOTCACHE.md`, `LEARNING.md`, `ANTI-PATTERNS.md` | Short-lived / curated consumer memory |
 | `ARCHITECTURE.md` | Optional stable design doc in the consumer |
@@ -33,7 +34,7 @@ This repository is the **shared blueprint package**. Consuming projects receive 
 ## How adopting projects work
 
 1. Run `./blueprint init --target /path/to/repo` — writes `HARNESS.md`, injects a managed harness reference into `AGENTS.md` or existing `agents.md` (creates `AGENTS.md` when neither exists), memory skeletons, and a managed `.gitignore` section from `templates/gitignore`. Does **not** modify existing `CLAUDE.md`.
-2. Run `./blueprint install <blueprint> --runtime all --target /path/to/repo` — projects `harness/` into `.cursor/` and/or `.claude/`.
+2. Run `./blueprint install <blueprint> --runtime all --target /path/to/repo` — projects `harness/` into `.cursor/`, `.claude/`, and/or `.agents/`.
 3. Local overrides (`*.local.md`, `*.local.mdc`, `.agent-blueprint.local.yaml`) always win over managed files.
 4. Memory state files are never overwritten by install/sync when they already exist in the target.
 5. `./blueprint update` checks target vs package `VERSION`, then refreshes `HARNESS.md` and managed runtime projections; it does not touch agent instruction files.
@@ -43,11 +44,11 @@ See [harness-ownership.md](harness-ownership.md) for precedence, markers, and re
 
 ## Runtime projection
 
-| Source | Cursor | Claude Code |
-|---|---|---|
-| `harness/commands/*.md` | `.cursor/commands/` | `.claude/commands/` |
-| `harness/skills/*/` | `.cursor/skills/` | `.claude/skills/` |
-| `harness/rules/*.mdc` | `.cursor/rules/*.mdc` | `.claude/rules/*.md` |
-| `templates/adr.md`, `review-checklist.md`, … | `.cursor/templates/` | `.claude/templates/` |
+| Source | Cursor | Claude Code | Codex |
+|---|---|---|---|
+| `harness/commands/*.md` | `.cursor/commands/` | `.claude/commands/` | `.agents/commands/` |
+| `harness/skills/*/` | `.cursor/skills/` | `.claude/skills/` | `.agents/skills/` |
+| `harness/rules/*.mdc` | `.cursor/rules/*.mdc` | `.claude/rules/*.md` | `.agents/rules/*.md` |
+| `templates/adr.md`, `review-checklist.md`, … | `.cursor/templates/` | `.claude/templates/` | `.agents/templates/` |
 
 Workflow templates (`adr`, `prd`, `review-checklist`) live **inside the runtime** only — they are not copied to the project root `templates/` folder.

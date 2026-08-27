@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lightweight package-manager style CLI for shared-agent-blueprints.
-# Usage: ./blueprint {init|install|update|sync|del|doctor} [blueprint] [--overlay NAME] [--runtime NAME] [--dry-run] [--force]
+# Usage: ./blueprint {init|install|install-contributor|update|sync|del|doctor} [blueprint] [--overlay NAME] [--runtime NAME] [--dry-run] [--force]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -248,6 +248,10 @@ bp_end_success() {
     session_mark_failed "$dest" || true
     exit 1
   fi
+  if [[ "${BP_COUNT_CONFLICT:-0}" -gt 0 ]]; then
+    emit_conflict_project_warning "$dest"
+    prompt_and_apply_conflict_overwrites "$dest"
+  fi
   render_summary_success "$src_label" "$duration"
   history_append || true
   session_complete "$dest" || true
@@ -367,11 +371,24 @@ resolve_blueprint_dir() {
 }
 
 normalize_runtimes() {
-  case "$1" in
-    cursor) echo "cursor" ;;
-    claude) echo "claude" ;;
-    all) echo "cursor claude" ;;
-    *) die "unknown runtime: $1 (cursor|claude|all)" ;;
+  local raw="${1:-}"
+  case "$raw" in
+    all) echo "cursor claude codex" ;;
+    "") die "--runtime requires a value (cursor|claude|codex|all)" ;;
+    *)
+      local tok out="" seen=" "
+      for tok in $raw; do
+        case "$tok" in
+          cursor|claude|codex) ;;
+          *) die "unknown runtime: $tok (cursor|claude|codex|all)" ;;
+        esac
+        if [[ "$seen" != *" $tok "* ]]; then
+          out+="$tok "
+          seen+="$tok "
+        fi
+      done
+      echo "${out%% }"
+      ;;
   esac
 }
 
@@ -383,6 +400,17 @@ runtime_available() {
     claude)
       command -v claude >/dev/null 2>&1
       ;;
+    codex)
+      command -v codex >/dev/null 2>&1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# Claude and Codex consume markdown rules; Cursor uses .mdc.
+runtime_projects_md_rules() {
+  case "$1" in
+    claude|codex) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -399,23 +427,25 @@ runtime_hint() {
 # Interactive / auto selector when --runtime was not passed.
 select_runtime() {
   if [[ "$RUNTIME_SET" -eq 1 ]]; then
-    [[ -n "$RUNTIME" ]] || die "--runtime requires a value (cursor|claude|all)"
+    [[ -n "$RUNTIME" ]] || die "--runtime requires a value (cursor|claude|codex|all)"
     return 0
   fi
 
-  local cursor_hint claude_hint
+  local cursor_hint claude_hint codex_hint
   cursor_hint="$(runtime_hint cursor)"
   claude_hint="$(runtime_hint claude)"
+  codex_hint="$(runtime_hint codex)"
 
   if [[ ! -t 0 || ! -t 1 ]]; then
-    if runtime_available cursor && runtime_available claude; then
-      RUNTIME="all"
-    elif runtime_available claude; then
-      RUNTIME="claude"
-    elif runtime_available cursor; then
-      RUNTIME="cursor"
+    local detected=""
+    runtime_available cursor && detected+="cursor "
+    runtime_available claude && detected+="claude "
+    runtime_available codex && detected+="codex "
+    detected="${detected%% }"
+    if [[ -n "$detected" ]]; then
+      RUNTIME="$detected"
     else
-      die "no --runtime and no TTY; pass --runtime cursor|claude|all"
+      die "no --runtime and no TTY; pass --runtime cursor|claude|codex|all"
     fi
     emit_info "auto runtime (non-interactive): $RUNTIME"
     return 0
@@ -424,26 +454,28 @@ select_runtime() {
   cat <<EOF
 
 Select AI runtime to install into the target project.
-(Neither tool is required on PATH — this only chooses which files to write.)
+(Tools are not required on PATH — this only chooses which files to write.)
 
   1) cursor   Cursor IDE        (.cursor/)  — ${cursor_hint}
   2) claude   Claude Code       (.claude/)  — ${claude_hint}
-  3) all      Cursor + Claude   (both)
+  3) codex    OpenAI Codex      (.agents/)  — ${codex_hint}
+  4) all      Cursor + Claude + Codex
 
   Esc) back
 
 EOF
   local choice=""
   while true; do
-    if ! term_prompt_read 'Runtime [1-3] (Esc back): '; then
+    if ! term_prompt_read 'Runtime [1-4] (Esc back): '; then
       return 1
     fi
     choice="${BP_READ_RESULT:-}"
     case "$choice" in
       1|cursor|c) RUNTIME="cursor"; break ;;
       2|claude) RUNTIME="claude"; break ;;
-      3|all|a) RUNTIME="all"; break ;;
-      *) warn "invalid choice: $choice (use 1-3, or Esc)" ;;
+      3|codex|x) RUNTIME="codex"; break ;;
+      4|all|a) RUNTIME="all"; break ;;
+      *) warn "invalid choice: $choice (use 1-4, or Esc)" ;;
     esac
   done
   emit_info "selected runtime: $RUNTIME"
@@ -454,6 +486,7 @@ runtime_root_name() {
   case "$1" in
     cursor) echo ".cursor" ;;
     claude) echo ".claude" ;;
+    codex) echo ".agents" ;;
     *) die "unknown runtime: $1" ;;
   esac
 }
@@ -517,11 +550,103 @@ copy_file() {
       fi
       ;;
   esac
+  # Successful package write resolves any prior conflict sibling for this path.
+  if [[ -f "${dest}.blueprint-conflict" ]]; then
+    rm -f "${dest}.blueprint-conflict"
+    emit_info "removed stale conflict sibling: $(basename "$dest").blueprint-conflict"
+  fi
   if [[ "$existed" -eq 1 ]]; then
     emit_file_updated "$dest"
   else
     emit_file_added "$dest"
   fi
+}
+
+# Apply package versions from *.blueprint-conflict siblings onto conflicted locals.
+apply_conflict_overwrites() {
+  local dest sibling backup ts applied=0
+  local paths="${BP_CONFLICT_PATHS:-}"
+  [[ -n "$paths" ]] || return 0
+
+  while IFS= read -r dest || [[ -n "$dest" ]]; do
+    [[ -n "$dest" ]] || continue
+    sibling="${dest}.blueprint-conflict"
+    if [[ ! -f "$sibling" ]]; then
+      emit_warning "no conflict sibling for $dest; skip overwrite"
+      continue
+    fi
+    ts="$(date -u +"%Y%m%dT%H%M%SZ" 2>/dev/null || date +%s)"
+    backup="${dest}.blueprint-backup.${ts}"
+    if [[ -f "$dest" ]]; then
+      if ! cp "$dest" "$backup"; then
+        emit_warning "failed to backup $dest; skip overwrite"
+        continue
+      fi
+    fi
+    if ! cp "$sibling" "$dest"; then
+      emit_warning "failed to overwrite $dest"
+      continue
+    fi
+    case "$dest" in
+      *.md|*.mdc)
+        if ! grep -qF "$MARKER" "$dest" 2>/dev/null; then
+          printf '\n%s\n' "$MARKER" >> "$dest"
+        fi
+        ;;
+    esac
+    rm -f "$sibling"
+    emit_file_updated "$dest"
+    emit_info "overwrote local file (backup: $(basename "$backup"))"
+    applied=$((applied + 1))
+  done <<< "$paths"
+
+  if [[ "$applied" -gt 0 ]]; then
+    BP_COUNT_CONFLICT=$((BP_COUNT_CONFLICT - applied))
+    if [[ "$BP_COUNT_CONFLICT" -lt 0 ]]; then
+      BP_COUNT_CONFLICT=0
+    fi
+    # Rebuild remaining conflict path list from leftover siblings when possible.
+    local remaining="" p
+    while IFS= read -r p || [[ -n "$p" ]]; do
+      [[ -n "$p" ]] || continue
+      if [[ -f "${p}.blueprint-conflict" ]]; then
+        if [[ -n "$remaining" ]]; then
+          remaining+=$'\n'
+        fi
+        remaining+="$p"
+      fi
+    done <<< "$paths"
+    BP_CONFLICT_PATHS="$remaining"
+    emit_info "Applied package versions to ${applied} conflicting file(s)"
+  fi
+}
+
+# Interactive TTY prompt to overwrite conflicts after install/sync/update.
+prompt_and_apply_conflict_overwrites() {
+  local root="${1:-${BP_CTX_ROOT:-${TARGET:-.}}}"
+  local n="${BP_COUNT_CONFLICT:-0}"
+  if [[ ! "$n" =~ ^[0-9]+$ ]] || [[ "$n" -eq 0 ]]; then
+    return 0
+  fi
+  if [[ "${DRY_RUN:-0}" -eq 1 || "${FORCE:-0}" -eq 1 ]]; then
+    return 0
+  fi
+  if ! term_interactive; then
+    return 0
+  fi
+
+  printf '\n' >&2
+  if ! term_prompt_read "Overwrite ${n} conflicting local file(s) with package versions? [y/N]: "; then
+    return 0
+  fi
+  case "${BP_READ_RESULT:-}" in
+    y|Y|yes|YES)
+      apply_conflict_overwrites
+      ;;
+    *)
+      emit_info "Left conflicting local files unchanged for $(basename "$root")"
+      ;;
+  esac
 }
 
 install_skills_into() {
@@ -547,7 +672,7 @@ install_rules_into() {
   local src_rule dest_name
   while IFS= read -r src_rule; do
     [[ -z "$src_rule" ]] && continue
-    if [[ "$runtime" == "claude" ]]; then
+    if runtime_projects_md_rules "$runtime"; then
       dest_name="${src_rule%.mdc}.md"
     else
       dest_name="$src_rule"
@@ -735,6 +860,79 @@ install_gitlab_overlay_into() {
   done
 }
 
+# True when package-root local override marks an intentional contributor runtime.
+contributor_local_marker_present() {
+  local dest_root="$1"
+  local f="${dest_root}/${LOCAL_OVERRIDE}"
+  [[ -f "$f" ]] && grep -qE '^profile:[[:space:]]*package-contributor([[:space:]]|$)' "$f"
+}
+
+write_contributor_local_marker() {
+  local dest_root="$1"
+  local runtimes_csv="$2"
+  local out="${dest_root}/${LOCAL_OVERRIDE}"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    emit_info "dry-run local marker: $out (profile=package-contributor runtimes=$runtimes_csv)"
+    return 0
+  fi
+  local rt_yaml=""
+  local r
+  for r in $runtimes_csv; do
+    rt_yaml="${rt_yaml}
+  - ${r}"
+  done
+  cat > "$out" <<EOF
+# Local package-contributor runtime — gitignored; do not commit.
+schema_version: 1
+profile: package-contributor
+runtimes:${rt_yaml}
+installed_at_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
+  emit_file_added "$out"
+}
+
+install_contributor_skill_into() {
+  local dest_skills="$1"
+  local skill="skill-creator"
+  local src="${PACKAGE_ROOT}/harness/skills/${skill}"
+  local f rel
+  if [[ ! -d "$src" ]]; then
+    emit_warning "skip missing skill: $src"
+    return 0
+  fi
+  mkdir -p "${dest_skills}/${skill}"
+  # shellcheck disable=SC2044
+  for f in $(find "$src" -type f); do
+    rel="${f#"${src}/"}"
+    copy_file "$f" "${dest_skills}/${skill}/${rel}"
+  done
+}
+
+install_contributor_runtime() {
+  local dest_root="$1"
+  local runtime="$2"
+  local rt_root
+  rt_root="$(runtime_root_name "$runtime")"
+  local base="${dest_root}/${rt_root}"
+  local dest_name
+
+  mkdir -p "${base}/commands" "${base}/rules" "${base}/skills"
+
+  copy_file "${PACKAGE_ROOT}/contributor/commands/commit.md" "${base}/commands/commit.md"
+  copy_file "${PACKAGE_ROOT}/contributor/commands/pr.md" "${base}/commands/pr.md"
+
+  if runtime_projects_md_rules "$runtime"; then
+    dest_name="contributor-standards.md"
+  else
+    dest_name="contributor-standards.mdc"
+  fi
+  copy_file \
+    "${PACKAGE_ROOT}/contributor/rules/contributor-standards.mdc" \
+    "${base}/rules/${dest_name}"
+
+  install_contributor_skill_into "${base}/skills"
+}
+
 package_source_ref() {
   local url=""
   if command -v git >/dev/null 2>&1 && [[ -d "${ROOT}/.git" || -f "${ROOT}/.git" ]]; then
@@ -880,6 +1078,7 @@ read_state_runtimes() {
   case "$legacy" in
     .cursor) echo "cursor" ;;
     .claude) echo "claude" ;;
+    .agents) echo "codex" ;;
     *) echo "" ;;
   esac
 }
@@ -984,6 +1183,39 @@ EOF
   emit_phase_complete "Installing harness"
   print_init_harness_summary
   emit_info "init complete (HARNESS.md + agent reference; run install --runtime to project tool runtimes)"
+  bp_end_success
+}
+
+cmd_install_contributor() {
+  bp_begin "Install-contributor" 1
+  local dest_root="$TARGET"
+  local abs_dest abs_root
+  abs_dest="$(cd "$dest_root" 2>/dev/null && pwd || echo "$dest_root")"
+  abs_root="$(cd "$ROOT" 2>/dev/null && pwd || echo "$ROOT")"
+  if [[ "$abs_dest" != "$abs_root" ]]; then
+    die "install-contributor only runs against the package root (got: $abs_dest)"
+  fi
+
+  PACKAGE_ROOT="$ROOT"
+  refresh_package_paths
+  need_file "${PACKAGE_ROOT}/contributor/commands/commit.md"
+  need_file "${PACKAGE_ROOT}/contributor/commands/pr.md"
+  need_file "${PACKAGE_ROOT}/contributor/rules/contributor-standards.mdc"
+  need_file "${PACKAGE_ROOT}/harness/skills/skill-creator/SKILL.md"
+
+  select_runtime || die "cancelled (no runtime selected)"
+
+  local runtimes
+  runtimes="$(normalize_runtimes "$RUNTIME")"
+
+  emit_phase_start "Copying contributor harness"
+  emit_info "installing package-contributor runtime -> $dest_root (runtimes: $runtimes)"
+  local rt
+  for rt in $runtimes; do
+    install_contributor_runtime "$dest_root" "$rt"
+  done
+  write_contributor_local_marker "$dest_root" "$runtimes"
+  emit_phase_complete "Copying contributor harness"
   bp_end_success
 }
 
@@ -1168,7 +1400,7 @@ cmd_update() {
     updated_runtimes=1
     emit_phase_complete "Updating managed runtime context"
   else
-    emit_info "no runtimes in state — skipped .cursor/.claude refresh (run install first)"
+    emit_info "no runtimes in state — skipped .cursor/.claude/.agents refresh (run install first)"
   fi
 
   # Stamp package version into state + targets registry.
@@ -1223,11 +1455,7 @@ cmd_sync() {
       local state_rts
       state_rts="$(read_state_runtimes "$state")"
       if [[ -n "$state_rts" ]]; then
-        if [[ "$state_rts" == *"cursor"* && "$state_rts" == *"claude"* ]]; then
-          RUNTIME="all"
-        else
-          RUNTIME="$(echo "$state_rts" | awk '{print $1}')"
-        fi
+        RUNTIME="$state_rts"
         RUNTIME_SET=1
       else
         emit_error "no runtimes in ${STATE_FILE}; run: ./blueprint install <blueprint>"
@@ -1267,6 +1495,79 @@ cmd_sync() {
   bp_end_success
 }
 
+# Delete reviewed *.blueprint-backup.* leftovers under the consumer target.
+cmd_clean() {
+  bp_begin "Clean" 1
+  local dest_root="$TARGET"
+  local abs_dest abs_root
+  abs_dest="$(cd "$dest_root" 2>/dev/null && pwd || echo "$dest_root")"
+  abs_root="$(cd "$ROOT" 2>/dev/null && pwd || echo "$ROOT")"
+
+  if [[ "$abs_dest" == "$abs_root" ]]; then
+    emit_error "refusing to clean backups in the package source itself — pass a consumer --target"
+    bp_end_failure
+    exit 1
+  fi
+
+  emit_phase_start "Scanning overwrite backups"
+  local n path
+  n="$(target_backup_count "$dest_root")"
+  if [[ ! "$n" =~ ^[0-9]+$ ]]; then
+    n=0
+  fi
+  emit_info "target: $(term_home_path "$abs_dest")"
+  emit_info "found ${n} *.blueprint-backup.* file(s)"
+  if [[ "$n" -gt 0 ]]; then
+    while IFS= read -r path || [[ -n "$path" ]]; do
+      [[ -n "$path" ]] || continue
+      emit_info "  $(term_home_path "$path")"
+    done < <(target_backup_list "$dest_root")
+  fi
+  emit_phase_complete "Scanning overwrite backups"
+
+  if [[ "$n" -eq 0 ]]; then
+    emit_info "nothing to clean"
+    bp_end_success
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    emit_info "dry-run: would delete ${n} backup file(s)"
+    bp_end_success
+    return 0
+  fi
+
+  if [[ -t 0 && -t 1 && "${CI:-}" != "1" && "$FORCE" -eq 0 ]]; then
+    if ! term_prompt_read "Delete ${n} *.blueprint-backup.* file(s) from $(basename "$abs_dest")? [y/N]: "; then
+      emit_info "clean cancelled"
+      bp_end_success
+      return 0
+    fi
+    case "${BP_READ_RESULT:-}" in
+      y|Y|yes|YES) ;;
+      *)
+        emit_info "clean cancelled"
+        bp_end_success
+        return 0
+        ;;
+    esac
+  elif [[ "$FORCE" -ne 1 ]]; then
+    emit_error "clean requires confirmation; re-run with --force for non-interactive deletion"
+    bp_end_failure
+    exit 1
+  fi
+
+  emit_phase_start "Deleting overwrite backups"
+  local deleted
+  deleted="$(target_clean_backups "$dest_root" 0)"
+  if [[ ! "$deleted" =~ ^[0-9]+$ ]]; then
+    deleted=0
+  fi
+  emit_info "deleted ${deleted} backup file(s)"
+  emit_phase_complete "Deleting overwrite backups"
+  bp_end_success
+}
+
 cmd_del() {
   bp_begin "Del" 1
   local dest_root="$TARGET"
@@ -1293,7 +1594,7 @@ cmd_del() {
     ANTI-PATTERNS.md
   )
   local has_anything=0
-  if [[ -f "$state" || -f "${dest_root}/HARNESS.md" || -d "${dest_root}/.cursor" || -d "${dest_root}/.claude" || -d "${dest_root}/.agent-blueprint" ]]; then
+  if [[ -f "$state" || -f "${dest_root}/HARNESS.md" || -d "${dest_root}/.cursor" || -d "${dest_root}/.claude" || -d "${dest_root}/.agents" || -d "${dest_root}/.agent-blueprint" ]]; then
     has_anything=1
   fi
   local mf
@@ -1326,7 +1627,7 @@ cmd_del() {
 
   emit_phase_start "Confirm removal"
   emit_info "target: $dest_root"
-  emit_info "will remove: HARNESS.md (if managed), memory files (PLANNING/DECISIONS/RUN_LOG/HOTCACHE/LEARNING/ANTI-PATTERNS), .cursor/, .claude/, .agent-blueprint.yaml, .agent-blueprint/, managed .gitignore section, harness reference block"
+  emit_info "will remove: HARNESS.md (if managed), memory files (PLANNING/DECISIONS/RUN_LOG/HOTCACHE/LEARNING/ANTI-PATTERNS), .cursor/, .claude/, .agents/, .agent-blueprint.yaml, .agent-blueprint/, managed .gitignore section, harness reference block"
   emit_info "will preserve: AGENTS.md / agents.md / CLAUDE.md body, local overrides"
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -1400,6 +1701,7 @@ cmd_del() {
   # Runtime projections (fully managed / typically gitignored).
   del_remove_path "${dest_root}/.cursor"
   del_remove_path "${dest_root}/.claude"
+  del_remove_path "${dest_root}/.agents"
 
   # Install state + session resume dir.
   del_remove_path "${dest_root}/${STATE_FILE}"
@@ -1449,7 +1751,7 @@ cmd_doctor() {
     ui_fail "missing VERSION (single source of package semver)"
     errors=$((errors + 1))
   fi
-  for d in blueprints/default harness/commands harness/rules harness/skills harness/migrations templates/memory templates/entrypoints prompts/system; do
+  for d in blueprints/default harness/commands harness/rules harness/skills harness/migrations templates/memory templates/entrypoints prompts/system contributor/commands contributor/rules; do
     if [[ ! -e "${ROOT}/$d" ]]; then
       ui_fail "missing $d"
       errors=$((errors + 1))
@@ -1476,9 +1778,40 @@ cmd_doctor() {
     errors=$((errors + 1))
   fi
 
+  ui_section "Skill naming"
+  local naming_out=""
+  if naming_out="$(validate_package_skill_naming 2>&1)"; then
+    ui_ok "package skills match naming standard (dirs + frontmatter)"
+  else
+    ui_fail "skill naming validation failed"
+    errors=$((errors + 1))
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -n "$line" ]] || continue
+      ui_info "  $line"
+    done <<< "$naming_out"
+    ui_info "See docs/standards/skill-naming.md"
+  fi
+
   if [[ "$package_mode" -eq 1 ]]; then
     ui_section "Package hygiene"
-    for bad in .cursor .claude PLANNING.md DECISIONS.md RUN_LOG.md HOTCACHE.md LEARNING.md ANTI-PATTERNS.md; do
+    local contributor_local=0
+    if contributor_local_marker_present "$dest_root"; then
+      contributor_local=1
+      ui_ok "contributor local marker (${LOCAL_OVERRIDE})"
+    fi
+    for bad in .cursor .claude .agents; do
+      if [[ -e "${dest_root}/${bad}" ]]; then
+        if [[ "$contributor_local" -eq 1 ]]; then
+          ui_ok "$bad (package-contributor local runtime)"
+        else
+          ui_fail "should not contain consumer artifact: $bad"
+          errors=$((errors + 1))
+        fi
+      else
+        ui_ok "no $bad"
+      fi
+    done
+    for bad in PLANNING.md DECISIONS.md RUN_LOG.md HOTCACHE.md LEARNING.md ANTI-PATTERNS.md; do
       if [[ -e "${dest_root}/${bad}" ]]; then
         ui_fail "should not contain consumer artifact: $bad"
         errors=$((errors + 1))
@@ -1558,7 +1891,7 @@ cmd_doctor() {
       else
         local found_runtime=0
         local rt rt_root
-        for rt in cursor claude; do
+        for rt in cursor claude codex; do
           rt_root="$(runtime_root_name "$rt")"
           if [[ -d "${dest_root}/${rt_root}" ]]; then
             if echo " $declared " | grep -q " $rt "; then
@@ -1580,6 +1913,40 @@ cmd_doctor() {
           ui_fail "no declared tool runtime directory found"
           errors=$((errors + 1))
         fi
+      fi
+
+      ui_section "Conflicts"
+      local conflict_n conflict_path
+      conflict_n="$(target_conflict_count "$dest_root")"
+      if [[ ! "$conflict_n" =~ ^[0-9]+$ ]]; then
+        conflict_n=0
+      fi
+      if [[ "$conflict_n" -gt 0 ]]; then
+        ui_info "${conflict_n} unresolved *.blueprint-conflict file(s) in $(basename "$dest_root")"
+        while IFS= read -r conflict_path || [[ -n "$conflict_path" ]]; do
+          [[ -n "$conflict_path" ]] || continue
+          ui_info "  $(term_home_path "$conflict_path")"
+        done < <(target_conflict_list "$dest_root")
+        ui_info "Merge siblings manually, or re-run install/sync/update with --force to overwrite"
+      else
+        ui_ok "no unresolved *.blueprint-conflict siblings"
+      fi
+
+      ui_section "Backups"
+      local backup_n backup_path
+      backup_n="$(target_backup_count "$dest_root")"
+      if [[ ! "$backup_n" =~ ^[0-9]+$ ]]; then
+        backup_n=0
+      fi
+      if [[ "$backup_n" -gt 0 ]]; then
+        ui_info "${backup_n} *.blueprint-backup.* file(s) in $(basename "$dest_root") (safe to delete after review)"
+        while IFS= read -r backup_path || [[ -n "$backup_path" ]]; do
+          [[ -n "$backup_path" ]] || continue
+          ui_info "  $(term_home_path "$backup_path")"
+        done < <(target_backup_list "$dest_root")
+        ui_info "CLI: ./blueprint clean --force --target ${abs_dest}"
+      else
+        ui_ok "no *.blueprint-backup.* leftovers"
       fi
     fi
   fi
@@ -1617,8 +1984,10 @@ Commands:
   (none) / menu        Interactive menu (TTY)
   init                 Write HARNESS.md + agent harness reference, memory, .gitignore
   install <blueprint>  Install blueprint into --target runtimes
+  install-contributor  Project package-only contributor harness into this package root
   update               Version check, then refresh HARNESS.md + managed runtimes (preserves agent files)
   sync                 Re-apply installed blueprint with preserve-local
+  clean                Delete reviewed *.blueprint-backup.* leftovers on --target
   del                  Remove blueprint from --target (keyword only in menu; no number)
   doctor               Validate package + target install health
 
@@ -1627,11 +1996,25 @@ Blueprints:
 
 Flags:
   --overlay gitlab     Install GitLab/glab command overlay
-  --runtime NAME       cursor | claude | all
-                       (omit to get an interactive selector; both tools optional)
+  --runtime NAME       cursor | claude | codex | all
+                       (omit to get an interactive selector; tools optional)
   --target PATH        Consumer project root (any local path; not this package)
+                       (install-contributor: must be this package root)
   --dry-run            Print actions without writing
-  --force              Overwrite unmanaged files; required for non-interactive del
+  --force              Overwrite unmanaged conflicting runtime files; also required for non-interactive del/clean
+
+Examples:
+  ./blueprint update --force --target ~/Developer/my-app
+  ./blueprint sync --force --target ~/Developer/my-app
+  ./blueprint clean --force --target ~/Developer/my-app
+  ./blueprint install engineering --overlay gitlab --runtime all --force --target ~/Developer/my-app
+  ./blueprint del --force --target ~/Developer/my-app
+
+  Interactive menu (./blueprint): choose 4) update — if conflicts appear, answer y
+  to overwrite locals from *.blueprint-conflict. Typing "update --force" in the
+  menu is not supported; pass --force on the CLI as above.
+  After review, run clean (menu keyword or Known projects → clean) to delete
+  *.blueprint-backup.* leftovers. Status * means backups still need clean.
 
 Install on PATH (optional):
   ln -s /path/to/agent-harness-blueprint/blueprint /usr/local/bin/blueprint
@@ -1639,6 +2022,11 @@ Install on PATH (optional):
 Remote source:
   When .agent-blueprint.yaml source is a git URL, install/sync clone or update
   a cache under $XDG_CACHE_HOME/blueprint/repos/ then copy from that cache.
+
+Package contributors:
+  ./blueprint install-contributor --runtime all
+  Projects contributor/ + skill-creator into gitignored .cursor/.claude/.agents
+  (writes .agent-blueprint.local.yaml; not for consumer targets).
 EOF
 }
 
@@ -1867,11 +2255,11 @@ menu_prompt_target_pick() {
       table_args+=("${t_paths[$i]}" "${versions[$i]:-?}")
     done
     render_targets_table "${table_args[@]}"
-    render_targets_actions 48
+    render_targets_actions 56
 
     local choice=""
     # Esc is disabled on the known-projects screen (avoids menu ↔ picker loops).
-    if ! term_prompt_read "Target [1-${n} | add|rm|q]: "; then
+    if ! term_prompt_read "Target [1-${n} | add|rm|clean|q]: "; then
       continue
     fi
     choice="${BP_READ_RESULT:-}"
@@ -1884,6 +2272,27 @@ menu_prompt_target_pick() {
 
     if [[ "$choice" == "add" || "$choice" == "a" || "$choice" == "n" || "$choice" == "new" ]]; then
       return 1
+    fi
+
+    if [[ "$choice" == "clean" || "$choice" == "c" ]]; then
+      local clean_choice=""
+      if ! term_prompt_read "Clean backups on which target [1-${n}] (Esc cancel): "; then
+        continue
+      fi
+      clean_choice="${BP_READ_RESULT:-}"
+      clean_choice="${clean_choice#"${clean_choice%%[![:space:]]*}"}"
+      clean_choice="${clean_choice%"${clean_choice##*[![:space:]]}"}"
+      if [[ -z "$clean_choice" ]]; then
+        continue
+      fi
+      if [[ ! "$clean_choice" =~ ^[0-9]+$ ]] || [[ "$clean_choice" -lt 1 || "$clean_choice" -gt "$n" ]]; then
+        warn "invalid choice: $clean_choice"
+        continue
+      fi
+      local clean_idx=$((clean_choice - 1))
+      TARGET="${t_paths[$clean_idx]}"
+      menu_run cmd_clean
+      continue
     fi
 
     if [[ "$choice" == "rm" || "$choice" == "r" || "$choice" == "remove" ]]; then
@@ -2102,6 +2511,10 @@ cmd_menu() {
         # Keyword only — never bind a menu number to destructive removal.
         menu_run cmd_del
         ;;
+      clean)
+        # Keyword only — clear reviewed *.blueprint-backup.* on current target.
+        menu_run cmd_clean
+        ;;
       q|quit|exit)
         term_reset_clear_flag
         term_smart_clear
@@ -2112,7 +2525,7 @@ cmd_menu() {
         # Empty Enter re-prompts; use q to quit.
         ;;
       *)
-        warn "invalid choice: $choice (use 1-6, h, q, del, or Esc)"
+        warn "invalid choice: $choice (use 1-6, h, q, del, clean, or Esc)"
         sleep 0.6 2>/dev/null || true
         ;;
     esac
@@ -2123,8 +2536,10 @@ case "$cmd" in
   menu|interactive) cmd_menu ;;
   init) cmd_init ;;
   install) cmd_install ;;
+  install-contributor) cmd_install_contributor ;;
   update) cmd_update ;;
   sync) cmd_sync ;;
+  clean) cmd_clean ;;
   del) cmd_del ;;
   doctor) cmd_doctor ;;
   -h|--help|help) usage ;;

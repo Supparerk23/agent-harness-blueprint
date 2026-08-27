@@ -15,6 +15,7 @@
 
 # Logs / coverage / build artifacts
 *.log
+!harness/migrations/renames.log
 coverage/
 .coverage
 dist/
@@ -29,6 +30,7 @@ __pycache__/
 venv/
 
 *.blueprint-conflict
+*.blueprint-backup.*
 .tmp-consumer-test/
 .tmp-consumer-test-*/
 .tmp-skill-src/
@@ -39,6 +41,8 @@ venv/
 # Adoption/runtime artifacts belong in consuming projects, not this package
 .cursor/
 .claude/
+.agents/
+.testiny/
 PLANNING.md
 DECISIONS.md
 RUN_LOG.md

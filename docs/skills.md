@@ -1,6 +1,6 @@
 # Skills
 
-Package sources live under [harness/skills/](../harness/skills/). After install, the same folders appear under the consumer's `.cursor/skills/` and/or `.claude/skills/` as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
+Package sources live under [harness/skills/](../harness/skills/). After install, the same folders appear under the consumer's `.cursor/skills/`, `.claude/skills/`, and/or `.agents/skills/` as `SKILL.md` plus optional bundles (templates, scripts, references). They are **human-curated** procedures—load them when the task matches their scope.
 
 ## `task-execution`
 
@@ -50,6 +50,14 @@ Vendored from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (MIT).
 Vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT).
 
 **Required with `refactor-code`:** invoking `/refactor-code` must also enable `/ponytail` for that session.
+
+## `generate-test-cases`
+
+**Intent:** Senior-QA playbook that analyzes a software change (JIRA / branch / PR / `PLANNING.md`) and writes a Testiny-importable CSV to `.testiny/testcases-<JIRA>.csv` (gitignored). Ships with `disable-model-invocation` — invoke explicitly (`/generate-test-cases`). Schema and column rules live in the skill markdown (no bundled CSV). Opt-in only; never auto-run for ordinary coding work.
+
+## `update-api-docs`
+
+**Intent:** Keep FastAPI OpenAPI YAML (`docs/api/openapi.yaml`) and response example JSON files in sync with `app/routers/`. Prefer re-export via `app.openapi()`; fall back to manual path/schema/example edits. Use when adding, removing, or changing API endpoints, refreshing swagger/OpenAPI, or updating response examples.
 
 ## `skill-creator`
 

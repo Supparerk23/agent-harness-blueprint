@@ -12,7 +12,7 @@ This file is managed by **shared-agent-blueprints**. Project-specific agent role
 2. Local overrides (`AGENTS.local.md`, `CLAUDE.local.md`, `.agent-blueprint.local.yaml`, `*.local.mdc`)
 3. This `HARNESS.md` (lifecycle, safety, quality gates, completion)
 4. Project agent contract (`AGENTS.md` or `agents.md`) outside the managed harness reference
-5. Runtime rules / skills under `.cursor/` or `.claude/`
+5. Runtime rules / skills under `.cursor/`, `.claude/`, or `.agents/`
 
 ## Harness overview
 
@@ -33,6 +33,7 @@ After `install --runtime …`:
 |---|---|---|---|---|---|
 | Cursor | `.cursor/` | `.cursor/commands/` | `.cursor/rules/` | `.cursor/skills/` | `.cursor/templates/` |
 | Claude Code | `.claude/` | `.claude/commands/` | `.claude/rules/` | `.claude/skills/` | `.claude/templates/` |
+| Codex | `.agents/` | `.agents/commands/` | `.agents/rules/` | `.agents/skills/` | `.agents/templates/` |
 
 Workflow templates (`adr`, `prd`, `review-checklist`) stay under the runtime — they are not copied to a project-root `templates/` folder.
 
@@ -71,6 +72,8 @@ Skills live under the active runtime (`<runtime>/skills/`). Prefer matching a sk
 | Reading or updating memory layers | `context-recall` | Use when memory files drive the session. |
 | Docs IA / README split | `docs-style` | Opt-in / explicit invoke. |
 | Creating or tuning a skill | `skill-creator` | Opt-in / explicit invoke. |
+| Generate Testiny QA CSV for a change | `generate-test-cases` | Opt-in / explicit invoke (`disable-model-invocation`). Writes `.testiny/testcases-<JIRA>.csv`. |
+| Sync OpenAPI YAML / API response examples with routers | `update-api-docs` | Prefer when `app/routers/` or `docs/api/openapi.yaml` changes; or when asked to refresh swagger/OpenAPI/examples. |
 | Simplify / dedupe / modularity refactor | `refactor-code` + `/ponytail` | **Required pairing:** when `/refactor-code` (or refactor-code) is invoked, **must** also enable `/ponytail` (default `full`). Applies to any programming language. Do not run refactor-code alone. Prefer `/ponytail-review` on the resulting diff. |
 
 Pairing: `/ponytail` shrinks what you build; `/i-have-adhd` shapes how replies are written. Suggest both when a coding task is also multi-step and easy to lose track of — still ask before enabling ADHD mode.

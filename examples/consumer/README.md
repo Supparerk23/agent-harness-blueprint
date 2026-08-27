@@ -38,6 +38,7 @@ overlay: gitlab
 runtimes:
   - cursor
   - claude
+  - codex
 installed_at_utc: 2026-07-29T00:00:00Z
 conflict_policy: preserve-local
 harness:
@@ -70,9 +71,9 @@ overrides:
 
 ## What gets copied vs what stays local
 
-**Copied (managed):** `.cursor/` and/or `.claude/` commands, skills, rules, and `templates/` (agent-workflow only) from selected blueprint; root `HARNESS.md` from `templates/entrypoints/` (`init` / `update`). Agent instruction files keep a managed harness reference block on `init` only.
+**Copied (managed):** `.cursor/`, `.claude/`, and/or `.agents/` commands, skills, rules, and `templates/` (agent-workflow only) from selected blueprint; root `HARNESS.md` from `templates/entrypoints/` (`init` / `update`). Agent instruction files keep a managed harness reference block on `init` only.
 
-Workflow docs such as `review-checklist.md` / `adr.md` land under `.cursor/templates/` or `.claude/templates/` — not the project root.
+Workflow docs such as `review-checklist.md` / `adr.md` land under `.cursor/templates/`, `.claude/templates/`, or `.agents/templates/` — not the project root.
 
 **Preserved (user-owned):** existing `AGENTS.md` / `agents.md` content outside managed markers; existing `CLAUDE.md` (never modified by init/update).
 

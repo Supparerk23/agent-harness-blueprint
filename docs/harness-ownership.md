@@ -7,7 +7,7 @@ How `HARNESS.md` relates to root instruction files (`AGENTS.md` / `agents.md` / 
 | File or section | Owner | `init` may modify | `update` may modify |
 |---|---|---|---|
 | `HARNESS.md` | Blueprint Service | Yes | Yes |
-| Managed runtime projections (`.cursor/` / `.claude/`) | Blueprint Service | via `install` | Yes (when runtimes declared) |
+| Managed runtime projections (`.cursor/` / `.claude/` / `.agents/`) | Blueprint Service | via `install` | Yes (when runtimes declared) |
 | Managed `.gitignore` section | Blueprint Service | Yes | Yes |
 | `.agent-blueprint.yaml` version fields | Blueprint Service | Yes | Yes |
 | Managed block in selected instruction file | Blueprint Service | Yes | No |
@@ -67,7 +67,7 @@ If only `START` or only `END` is present (or duplicates), `init` leaves the inst
 1. **Version check** — compare target `.agent-blueprint.yaml` `version` to package `./VERSION`. On mismatch, show a red notice (TUI prompts to confirm).
 2. Refresh managed blueprint context:
    - root `HARNESS.md`
-   - managed runtime projections (`.cursor/` / `.claude/` skills, commands, rules, templates) when runtimes are declared
+   - managed runtime projections (`.cursor/` / `.claude/` / `.agents/` skills, commands, rules, templates) when runtimes are declared
    - managed `.gitignore` section
    - stamp package version into state + targets registry
 

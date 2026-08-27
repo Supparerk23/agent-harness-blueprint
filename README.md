@@ -1,8 +1,8 @@
 # Shared Agent Blueprints
 
-Reusable multi-agent harness for **Cursor**, **Claude Code**, and any tool that honors `AGENTS.md`.
+Reusable multi-agent harness for **Cursor**, **Claude Code**, **OpenAI Codex**, and any tool that honors `AGENTS.md`.
 
-This repository is the **blueprint package** (CLI + canonical `harness/` content). Adopting projects run `init` → `install` before product work. Live `.cursor/` / `.claude/` trees and task memory files belong in consumers only.
+This repository is the **blueprint package** (CLI + canonical `harness/` content). Adopting projects run `init` → `install` before product work. Live `.cursor/` / `.claude/` / `.agents/` trees and task memory files belong in consumers only.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -16,7 +16,7 @@ This package keeps harness sources canonical, projects them into tool runtimes o
 
 ## Features
 
-- **Multi-runtime projection** — install into Cursor, Claude Code, or both (`--runtime`)
+- **Multi-runtime projection** — install into Cursor, Claude Code, Codex, or all (`--runtime`)
 - **Blueprint profiles** — `default`, `engineering`, `startup` (+ optional GitLab overlay)
 - **Managed consumer contract** — `HARNESS.md` + harness reference in `AGENTS.md` / `agents.md`
 - **Preserve-local sync** — refreshes managed files without clobbering memory or agent bodies
@@ -40,6 +40,7 @@ flowchart LR
     agents[AGENTS.md]
     cursor[".cursor/"]
     claude[".claude/"]
+    agentsRt[".agents/"]
     memory[Memory files]
   end
 
@@ -48,13 +49,14 @@ flowchart LR
   entry -->|init| agents
   harness -->|install| cursor
   harness -->|install| claude
+  harness -->|install| agentsRt
 ```
 
 | Concept | Detail |
 |---|---|
 | Package | `harness/`, `blueprints/`, `templates/`, `./blueprint` |
 | Consumer contract | `AGENTS.md` (+ thin `CLAUDE.md`) |
-| Runtimes | `.cursor/` and/or `.claude/` from `--runtime` |
+| Runtimes | `.cursor/`, `.claude/`, and/or `.agents/` from `--runtime` |
 
 Deep dive: [docs/architecture.md](docs/architecture.md) · [docs/compatibility.md](docs/compatibility.md)
 
@@ -90,7 +92,7 @@ Example output shape:
 ```text
 ✓ package OK
 ✓ wrote HARNESS.md
-✓ projected harness → .cursor/ .claude/
+✓ projected harness → .cursor/ .claude/ .agents/
 ✓ target healthy
 ```
 
@@ -117,7 +119,7 @@ After `init`, the consumer gets:
 | `HARNESS.md` | Managed harness entry (refreshed by `update`) |
 | `AGENTS.md` / `agents.md` | Agent contract + managed harness reference block |
 
-`--runtime`: `cursor` | `claude` | `all`. Omit for an interactive selector.
+`--runtime`: `cursor` | `claude` | `codex` | `all`. Omit for an interactive selector.
 
 Remote `source` git URLs are cached under `$XDG_CACHE_HOME/blueprint/repos/`. Details: [docs/harness-ownership.md](docs/harness-ownership.md)
 
@@ -130,6 +132,7 @@ Commands:
   (none) / menu        Interactive menu (TTY)
   init                 Write HARNESS.md + agent harness reference, memory, .gitignore
   install <blueprint>  Install blueprint into --target runtimes
+  install-contributor  Project package-only contributor harness (this package root)
   update               Version check, then refresh HARNESS.md + managed runtimes
   sync                 Re-apply installed blueprint with preserve-local
   del                  Remove blueprint from --target
@@ -139,7 +142,7 @@ Blueprints:  default | engineering | startup
 
 Flags:
   --overlay gitlab     Install GitLab/glab command overlay
-  --runtime NAME       cursor | claude | all
+  --runtime NAME       cursor | claude | codex | all
   --target PATH        Consumer project root
   --dry-run            Print actions without writing
   --force              Overwrite unmanaged files; required for non-interactive del
@@ -148,7 +151,8 @@ Flags:
 | Step | Result |
 |---|---|
 | `init` | `HARNESS.md`, agent harness reference, memory skeletons, managed `.gitignore` — **no** tool runtime yet |
-| `install` | Projects commands/rules/skills into `.cursor/` and/or `.claude/` |
+| `install` | Projects commands/rules/skills into `.cursor/`, `.claude/`, and/or `.agents/` |
+| `install-contributor` | Package-only: projects `contributor/` + `skill-creator` into gitignored local runtimes |
 | `update` | Version check vs package `VERSION`, refresh `HARNESS.md`, apply skill/rule renames, full-refresh managed skills/rules — never rewrites agent instruction files |
 | `sync` | Re-applies the installed blueprint (`preserve-local`); may fetch a remote `source` |
 | `del` | Removes managed blueprint + memory files; preserves agent instruction bodies |
@@ -166,6 +170,9 @@ History is stored under `$XDG_DATA_HOME/blueprint/history.jsonl` (no secrets).
 
 # Startup / PRD-heavy profile
 ./blueprint install startup --runtime cursor --target ~/code/my-app
+
+# Codex only (skills under .agents/skills/)
+./blueprint install default --runtime codex --target ~/code/my-app
 
 # Refresh later
 ./blueprint sync --target ~/code/my-app
@@ -221,9 +228,10 @@ Optionally delete the package checkout. `del` does not rewrite `AGENTS.md` / `CL
 | Symptom | What to try |
 |---|---|
 | `doctor` fails on package | Run from the package root; ensure `VERSION`, `manifest.yaml`, and `harness/` are present |
-| `install` asks for runtime in CI | Pass `--runtime cursor\|claude\|all` explicitly |
+| `install` asks for runtime in CI | Pass `--runtime cursor\|claude\|codex\|all` explicitly |
 | Target must not be this package | Point `--target` at a **consumer** repo, not this checkout |
-| Conflicts (`*.blueprint-conflict`) | Compare sibling files; merge manually; re-run `sync` |
+| Conflicts (`*.blueprint-conflict`) | Compare sibling files; merge manually; re-run with `--force` to overwrite; interactive update/sync also prompts to apply package versions |
+| Leftover backups (`*.blueprint-backup.*`) | After review, `./blueprint clean --force --target …` (or menu `clean` / Known projects → `clean`). Status `*` means clean is needed |
 | Stale remote blueprint | `sync` again, or clear `$XDG_CACHE_HOME/blueprint/repos/` and retry |
 | Interrupted install/sync | Re-run the same command; resume state lives under consumer `.agent-blueprint/` |
 | Menu has no targets | Add a path when prompted; package-local `targets.json` is gitignored |
@@ -285,14 +293,15 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, bra
 
 ```text
 .
-├── harness/             # canonical commands, rules, skills
+├── harness/             # canonical commands, rules, skills (consumer)
+├── contributor/         # package-only commit/PR/skill standards
 ├── blueprints/          # default | engineering | startup
 ├── templates/           # entrypoints + memory + PRD/ADR
 ├── lib/blueprint/       # CLI terminal UX modules
 ├── prompts/             # prompt library
 ├── docs/                # diagrams + deep docs
 ├── tests/cli/           # CLI smoke tests
-├── blueprint            # CLI: init | install | sync | doctor | menu
+├── blueprint            # CLI: init | install | install-contributor | sync | doctor
 └── examples/consumer/   # example consumer install state
 ```
 

@@ -6,7 +6,8 @@ Core shared agent harness for any repository.
 
 - Commands: `/start`, `/review`
 - Rules: safety, task-execution
-- Skills: context-recall, task-execution, docs-style, skill-creator
+- Skills: `context-recall`, `task-execution`, `docs-style`, `skill-creator`, `i-have-adhd`, `ponytail` (+ review/audit/debt/gain/help), `generate-test-cases`, `update-api-docs`
+- `refactor-code` is added by the `engineering` profile (consumer `install` still projects the full package skill set from `package_skill_names`)
 - Memory templates under `templates/memory/`
 - Consumer entrypoints from `templates/entrypoints/`
 
@@ -15,4 +16,4 @@ Core shared agent harness for any repository.
 - GitLab `glab` MR automation
 - Project-specific engineering etiquette
 
-Use `engineering` plus forge overlays (`--overlay gitlab`) when those are needed. Choose `--runtime cursor|claude|all` for the tool projection.
+Use `engineering` plus forge overlays (`--overlay gitlab`) when those are needed. Choose `--runtime cursor|claude|codex|all` for the tool projection.

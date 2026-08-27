@@ -29,7 +29,7 @@ What happened instead (include command output if relevant).
 - OS:
 - Package version (`cat VERSION` or installed commit):
 - Command(s) run:
-- Runtime (`cursor` / `claude` / `all` / n/a):
+- Runtime (`cursor` / `claude` / `codex` / `all` / n/a):
 
 ## Additional context
 

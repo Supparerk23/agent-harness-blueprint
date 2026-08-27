@@ -23,6 +23,8 @@ includes:
       - ponytail-debt
       - ponytail-gain
       - ponytail-help
+      - generate-test-cases
+      - update-api-docs
   prompts:
     commands:
       - start.md

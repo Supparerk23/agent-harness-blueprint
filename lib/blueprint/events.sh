@@ -8,6 +8,7 @@ BP_COUNT_SKIPPED=0
 BP_COUNT_FAILED=0
 BP_COUNT_CONFLICT=0
 BP_COUNT_CHECKED=0
+BP_CONFLICT_PATHS=""
 BP_PHASE=""
 BP_PHASE_FAILED=""
 BP_ERROR_REASON=""
@@ -29,6 +30,7 @@ events_reset() {
   BP_COUNT_FAILED=0
   BP_COUNT_CONFLICT=0
   BP_COUNT_CHECKED=0
+  BP_CONFLICT_PATHS=""
   BP_PHASE=""
   BP_PHASE_FAILED=""
   BP_ERROR_REASON=""
@@ -209,11 +211,35 @@ emit_file_conflict() {
   BP_COUNT_CONFLICT=$((BP_COUNT_CONFLICT + 1))
   BP_COUNT_SKIPPED=$((BP_COUNT_SKIPPED + 1))
   BP_COUNT_CHECKED=$((BP_COUNT_CHECKED + 1))
+  if [[ -n "$BP_CONFLICT_PATHS" ]]; then
+    BP_CONFLICT_PATHS+=$'\n'
+  fi
+  BP_CONFLICT_PATHS+="$path"
   render_finalize_progress
   render_status "warning" "Conflict: $path"
   render_status "info" "The destination file contains local modifications."
   render_status "info" "The file was not overwritten."
   session_mark_file_done "$path" "conflict" || true
+}
+
+# Project-level conflict summary (call before success summary when conflicts exist).
+emit_conflict_project_warning() {
+  local root="${1:-${BP_CTX_ROOT:-${TARGET:-.}}}"
+  local n="${BP_COUNT_CONFLICT:-0}"
+  if [[ ! "$n" =~ ^[0-9]+$ ]] || [[ "$n" -eq 0 ]]; then
+    return 0
+  fi
+  local name
+  name="$(basename "$root")"
+  render_finalize_progress
+  render_status "warning" "Project ${name} has ${n} conflict(s)"
+  render_status "info" "Local files preserved; package copies at *.blueprint-conflict"
+  render_status "info" "Re-run with --force to overwrite, or merge siblings manually"
+  local p
+  while IFS= read -r p || [[ -n "$p" ]]; do
+    [[ -n "$p" ]] || continue
+    render_status "info" "  $(term_home_path "$p")"
+  done <<< "$BP_CONFLICT_PATHS"
 }
 
 emit_file_failed() {
